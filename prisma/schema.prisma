@@ -1,0 +1,308 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum RiskStatus {
+  NORMAL
+  WASPADA
+  SIAGA
+  AWAS
+}
+
+enum PointType {
+  GNSS
+  AWLR
+  CCTV
+  WEATHER
+}
+
+enum DeviceType {
+  GNSS
+  AWLR
+  CCTV
+  LOGGER
+  WEATHER
+}
+
+enum DeviceStatus {
+  ONLINE
+  WEAK
+  OFFLINE
+  MAINTENANCE
+}
+
+enum EventState {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum ReportStatus {
+  QUEUED
+  READY
+  FAILED
+}
+
+model Role {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  access    String
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  roleId       String
+  role         Role     @relation(fields: [roleId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model MonitoringArea {
+  id          String            @id @default(cuid())
+  name        String            @unique
+  city        String
+  province    String
+  description String?
+  points      MonitoringPoint[]
+  alarms      Alarm[]
+  events      Event[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model MonitoringPoint {
+  id                 String              @id @default(cuid())
+  code               String              @unique
+  name               String
+  type               PointType
+  latitude           Float
+  longitude          Float
+  areaId             String
+  area               MonitoringArea      @relation(fields: [areaId], references: [id])
+  status             RiskStatus          @default(NORMAL)
+  latestValue        String?
+  baselineElevationM Float?
+  currentElevationM  Float?
+  totalSubsidenceCm  Float?
+  velocityCmYear     Float?
+  lastUpdate         DateTime
+  devices            Device[]
+  gnssReadings       GnssReading[]
+  waterReadings      WaterLevelReading[]
+  weatherReadings    WeatherReading[]
+  snapshots          CameraSnapshot[]
+  alarms             Alarm[]
+  alarmThresholds    PointThreshold[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([areaId])
+  @@index([type])
+  @@index([status])
+}
+
+model Device {
+  id               String           @id @default(cuid())
+  code             String           @unique
+  name             String
+  type             DeviceType
+  status           DeviceStatus     @default(ONLINE)
+  battery          Int
+  signal           Int
+  solarCharging    Boolean          @default(true)
+  firmwareVersion  String?
+  sensorStatus     String?
+  lastDataReceived DateTime
+  pointId          String?
+  point            MonitoringPoint? @relation(fields: [pointId], references: [id])
+  maintenanceLogs  MaintenanceLog[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([status])
+  @@index([pointId])
+}
+
+model GnssReading {
+  id             String          @id @default(cuid())
+  pointId        String
+  point          MonitoringPoint @relation(fields: [pointId], references: [id])
+  recordedAt     DateTime
+  elevationM     Float
+  subsidenceCm   Float
+  velocityCmYear Float
+  createdAt      DateTime        @default(now())
+
+  @@index([pointId, recordedAt])
+}
+
+model WaterLevelReading {
+  id          String          @id @default(cuid())
+  pointId     String
+  point       MonitoringPoint @relation(fields: [pointId], references: [id])
+  recordedAt  DateTime
+  waterLevelM Float
+  waspadaM    Float
+  siagaM      Float
+  awasM       Float
+  createdAt   DateTime        @default(now())
+
+  @@index([pointId, recordedAt])
+}
+
+model WeatherReading {
+  id           String          @id @default(cuid())
+  pointId      String
+  point        MonitoringPoint @relation(fields: [pointId], references: [id])
+  recordedAt   DateTime
+  rainfallMm   Float?
+  temperatureC Float?
+  humidityPct  Float?
+  pressureHpa  Float?
+  windSpeedMs  Float?
+  createdAt    DateTime        @default(now())
+
+  @@index([pointId, recordedAt])
+}
+
+model CameraSnapshot {
+  id         String          @id @default(cuid())
+  pointId    String
+  point      MonitoringPoint @relation(fields: [pointId], references: [id])
+  capturedAt DateTime
+  imageUrl   String?
+  visibility String
+  status     RiskStatus      @default(NORMAL)
+  note       String?
+  createdAt  DateTime        @default(now())
+
+  @@index([pointId, capturedAt])
+}
+
+model Alarm {
+  id             String           @id @default(cuid())
+  code           String           @unique
+  type           String
+  areaId         String
+  area           MonitoringArea   @relation(fields: [areaId], references: [id])
+  pointId        String?
+  point          MonitoringPoint? @relation(fields: [pointId], references: [id])
+  status         RiskStatus
+  state          EventState       @default(OPEN)
+  message        String
+  occurredAt     DateTime
+  resolvedAt     DateTime?
+  resolutionNote String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([areaId])
+  @@index([pointId])
+  @@index([status])
+  @@index([state])
+}
+
+model Event {
+  id         String         @id @default(cuid())
+  title      String
+  areaId     String
+  area       MonitoringArea @relation(fields: [areaId], references: [id])
+  status     RiskStatus
+  state      EventState     @default(OPEN)
+  occurredAt DateTime
+  note       String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([areaId])
+  @@index([status])
+}
+
+model MaintenanceLog {
+  id          String     @id @default(cuid())
+  deviceId    String
+  device      Device     @relation(fields: [deviceId], references: [id])
+  technician  String
+  scheduledAt DateTime
+  note        String
+  state       EventState @default(OPEN)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([deviceId])
+  @@index([state])
+}
+
+model ReportTemplate {
+  id        String   @id
+  name      String
+  period    String
+  audience  String
+  formats   Json
+  reports   Report[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Report {
+  id          String         @id @default(cuid())
+  templateId  String
+  template    ReportTemplate @relation(fields: [templateId], references: [id])
+  areaName    String
+  status      ReportStatus   @default(QUEUED)
+  downloadUrl String?
+  generatedAt DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([templateId])
+  @@index([status])
+}
+
+model Threshold {
+  id        String   @id
+  metric    String
+  normal    String
+  waspada   String
+  siaga     String
+  awas      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PointThreshold {
+  id        String          @id @default(cuid())
+  pointId   String
+  point     MonitoringPoint @relation(fields: [pointId], references: [id], onDelete: Cascade)
+  parameter String
+  unit      String
+  normal    Float
+  waspada   Float
+  siaga     Float
+  awas      Float
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([pointId, parameter])
+  @@index([pointId])
+}
+
+model RiskWeight {
+  id        String   @id
+  metric    String
+  weight    Int
+  source    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

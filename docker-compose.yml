@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: gnss-dashboard-mysql
+    environment:
+      MYSQL_DATABASE: gnss_dashboard
+      MYSQL_USER: gnss
+      MYSQL_PASSWORD: gnss
+      MYSQL_ROOT_PASSWORD: gnss_root
+    ports:
+      - "3306:3306"
+    volumes:
+      - gnss-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -ugnss -pgnss --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  gnss-mysql-data:
