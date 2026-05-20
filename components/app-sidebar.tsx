@@ -31,6 +31,12 @@ function isActive(activePath: string, paths: string[]) {
   return paths.includes(activePath)
 }
 
+type SidebarUser = {
+  name: string
+  email: string
+  avatar: string
+}
+
 function getData(activePath = "/") {
   return {
     user: {
@@ -172,7 +178,27 @@ export function AppSidebar({
   activePath = "/",
   ...props
 }: React.ComponentProps<typeof Sidebar> & { activePath?: string }) {
-  const data = getData(activePath)
+  const data = React.useMemo(() => getData(activePath), [activePath])
+  const [user, setUser] = React.useState(data.user)
+
+  React.useEffect(() => {
+    const storedUser = window.localStorage.getItem("gnss:user")
+
+    if (!storedUser) return
+
+    try {
+      const parsed = JSON.parse(storedUser) as Partial<SidebarUser>
+
+      setUser((current) => ({
+        ...current,
+        name: parsed.name ?? current.name,
+        email: parsed.email ?? current.email,
+        avatar: parsed.avatar ?? current.avatar,
+      }))
+    } catch {
+      window.localStorage.removeItem("gnss:user")
+    }
+  }, [])
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -191,7 +217,7 @@ export function AppSidebar({
         <NavProjects label="Akses Cepat" projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

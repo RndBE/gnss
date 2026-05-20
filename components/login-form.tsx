@@ -18,9 +18,11 @@ import { cn } from "@/lib/utils"
 
 type LoginResponse = {
   user?: {
+    id: string
     name: string
     email: string
     role: string
+    access?: string
   }
   error?: string
 }
@@ -53,6 +55,7 @@ export function LoginForm({
       return
     }
 
+    window.localStorage.setItem("gnss:user", JSON.stringify(payload.user))
     setMessage(`Masuk sebagai ${payload.user.name} (${payload.user.role}).`)
     router.push("/")
     router.refresh()

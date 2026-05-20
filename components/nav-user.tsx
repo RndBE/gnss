@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -21,6 +22,7 @@ import {
   BellIcon,
   ChevronsUpDownIcon,
   FileChartColumnIcon,
+  LogOutIcon,
   Settings2Icon,
 } from "lucide-react"
 
@@ -34,6 +36,13 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
+
+  function logout() {
+    window.localStorage.removeItem("gnss:user")
+    router.push("/login")
+    router.refresh()
+  }
 
   return (
     <SidebarMenu>
@@ -93,6 +102,11 @@ export function NavUser({
                 Alarm & Event
               </DropdownMenuItem>
             </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={logout}>
+              <LogOutIcon />
+              Keluar
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
