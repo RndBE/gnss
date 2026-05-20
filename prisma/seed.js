@@ -71,7 +71,7 @@ function buildGnssReadings({
 
 function buildWaterLevelReadings({
   pointId,
-  days = 30,
+  days = 180,
   baseLevelM,
   amplitudeM,
   endLevelM,
@@ -79,30 +79,55 @@ function buildWaterLevelReadings({
   waspadaM,
   siagaM,
   awasM,
+  eventBiasM = 0,
 }) {
   const totalHours = days * 24;
   const rows = [];
 
-  function surge(elapsedHours, centerHours, widthHours, heightM) {
+  function bell(elapsedHours, centerHours, widthHours, heightM) {
     const distance = (elapsedHours - centerHours) / widthHours;
 
     return heightM * Math.exp(-(distance * distance) / 2);
   }
 
+  function jitter(elapsedHours) {
+    return (
+      Math.sin(elapsedHours * 0.73 + phase * 11) * 0.009 +
+      Math.cos(elapsedHours * 0.19 + phase * 7) * 0.006
+    );
+  }
+
   function rawValueAt(elapsedHours) {
     const progress = elapsedHours / totalHours;
-    const slowTrend = baseLevelM + (endLevelM - baseLevelM) * progress;
-    const smallTide =
-      amplitudeM * 0.14 * Math.sin((elapsedHours / 12.42 + phase) * Math.PI * 2);
-    const coastalSwell =
-      amplitudeM * 0.08 * Math.sin((elapsedHours / 84 + phase) * Math.PI * 2);
-    const eventSurge =
-      surge(elapsedHours, totalHours * 0.22, 20, amplitudeM * 0.35) +
-      surge(elapsedHours, totalHours * 0.48, 30, amplitudeM * 0.55) +
-      surge(elapsedHours, totalHours * 0.72, 36, amplitudeM * 0.75) +
-      surge(elapsedHours, totalHours * 0.95, 48, amplitudeM);
+    const meanLevel = baseLevelM + eventBiasM * Math.pow(progress, 1.4);
+    const springNeap =
+      0.82 + 0.18 * Math.sin((elapsedHours / (14.77 * 24) + phase) * Math.PI * 2);
+    const semidiurnal =
+      amplitudeM *
+      springNeap *
+      Math.sin((elapsedHours / 12.42 + phase) * Math.PI * 2);
+    const diurnalInequality =
+      amplitudeM *
+      0.24 *
+      Math.sin((elapsedHours / 24.84 + phase * 0.6) * Math.PI * 2);
+    const coastalSetUp =
+      amplitudeM *
+      0.12 *
+      Math.sin((elapsedHours / (6.8 * 24) + phase * 1.7) * Math.PI * 2);
+    const weatherSurge =
+      bell(elapsedHours, totalHours * 0.18, 26, amplitudeM * 0.18) +
+      bell(elapsedHours, totalHours * 0.46, 42, amplitudeM * 0.24) +
+      bell(elapsedHours, totalHours * 0.73, 54, amplitudeM * 0.28) +
+      bell(elapsedHours, totalHours - 10, 18, amplitudeM * 0.42);
 
-    return slowTrend + smallTide + coastalSwell + eventSurge;
+    return (
+      meanLevel +
+      semidiurnal +
+      diurnalInequality +
+      coastalSetUp +
+      weatherSurge +
+      jitter(elapsedHours)
+    );
   }
 
   const finalCorrection = endLevelM - rawValueAt(totalHours);
@@ -111,7 +136,7 @@ function buildWaterLevelReadings({
     const elapsed = totalHours - hoursBack;
     const progress = elapsed / totalHours;
 
-    return rawValueAt(elapsed) + finalCorrection * Math.pow(progress, 2.2);
+    return rawValueAt(elapsed) + finalCorrection * Math.pow(progress, 2.6);
   }
 
   function row(recordedAt, hoursBack) {
@@ -125,7 +150,12 @@ function buildWaterLevelReadings({
     };
   }
 
-  for (let hour = totalHours; hour > 24; hour -= 3) {
+  for (let day = days; day >= 4; day -= 1) {
+    const hoursBack = day * 24;
+    rows.push(row(hoursAgo(hoursBack), hoursBack));
+  }
+
+  for (let hour = 72; hour > 24; hour -= 1) {
     rows.push(row(hoursAgo(hour), hour));
   }
 
@@ -526,40 +556,44 @@ async function main() {
     data: [
       ...buildWaterLevelReadings({
         pointId: awlrPkl.id,
-        baseLevelM: 1.43,
-        amplitudeM: 0.31,
+        baseLevelM: 1.52,
+        amplitudeM: 0.19,
         endLevelM: 1.89,
         phase: 0.15,
+        eventBiasM: 0.08,
         waspadaM: 1.6,
         siagaM: 1.8,
         awasM: 2.0,
       }),
       ...buildWaterLevelReadings({
         pointId: awlrSmg.id,
-        baseLevelM: 1.29,
-        amplitudeM: 0.25,
+        baseLevelM: 1.4,
+        amplitudeM: 0.16,
         endLevelM: 1.62,
         phase: 0.55,
+        eventBiasM: 0.03,
         waspadaM: 1.55,
         siagaM: 1.75,
         awasM: 1.95,
       }),
       ...buildWaterLevelReadings({
         pointId: awlrBtg.id,
-        baseLevelM: 1.24,
-        amplitudeM: 0.28,
+        baseLevelM: 1.34,
+        amplitudeM: 0.17,
         endLevelM: 1.58,
         phase: 0.35,
+        eventBiasM: 0.04,
         waspadaM: 1.5,
         siagaM: 1.7,
         awasM: 1.9,
       }),
       ...buildWaterLevelReadings({
         pointId: awlrKdl.id,
-        baseLevelM: 1.33,
-        amplitudeM: 0.29,
+        baseLevelM: 1.42,
+        amplitudeM: 0.18,
         endLevelM: 1.72,
         phase: 0.75,
+        eventBiasM: 0.06,
         waspadaM: 1.52,
         siagaM: 1.7,
         awasM: 1.92,
