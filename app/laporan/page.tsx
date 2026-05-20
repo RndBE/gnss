@@ -19,6 +19,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const downloadableFormats = new Set(["PDF", "CSV", "Excel", "JSON"]);
+
+function formatHref(reportId: string, format: string) {
+  return `/api/reports/${reportId}/download?format=${encodeURIComponent(format.toLowerCase())}`;
+}
+
 export default async function LaporanPage() {
   const [summary, reportTemplates, generatedReports] = await Promise.all([
     getDashboardSummary(),
@@ -87,10 +93,20 @@ export default async function LaporanPage() {
                       <TableCell>{report.status}</TableCell>
                       <TableCell>{report.generatedAt}</TableCell>
                       <TableCell>
-                        {report.downloadUrl ? (
-                          <a className="inline-flex rounded-sm text-sm font-medium text-slate-950 underline-offset-4 transition-colors hover:text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href={report.downloadUrl}>
-                            Unduh
-                          </a>
+                        {report.downloadUrl && report.status === "Ready" ? (
+                          <div className="flex flex-wrap gap-2">
+                            {report.formats
+                              .filter((format) => downloadableFormats.has(format))
+                              .map((format) => (
+                                <a
+                                  className="interactive-tile inline-flex h-8 items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                                  href={formatHref(report.id, format)}
+                                  key={format}
+                                >
+                                  {format}
+                                </a>
+                              ))}
+                          </div>
                         ) : (
                           "-"
                         )}

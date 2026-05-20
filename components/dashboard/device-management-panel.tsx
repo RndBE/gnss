@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation"
 import {
   BatteryIcon,
   CalendarClockIcon,
+  DropletsIcon,
   EditIcon,
   PlusIcon,
   RadioIcon,
   SaveIcon,
+  ThermometerIcon,
   Trash2Icon,
   WifiIcon,
 } from "lucide-react"
@@ -125,6 +127,14 @@ const eventStateItems: Array<{ label: string; value: PrismaEventState }> = [
   { label: "In Progress", value: "IN_PROGRESS" },
   { label: "Resolved", value: "RESOLVED" },
 ]
+
+function formatTemperature(value: number | null) {
+  return value == null ? "-" : `${value.toFixed(1)} C`
+}
+
+function formatHumidity(value: number | null) {
+  return value == null ? "-" : `${value.toFixed(1)}%`
+}
 
 const emptyDeviceForm: DeviceFormState = {
   code: "",
@@ -361,6 +371,8 @@ export function DeviceManagementPanel({
                 <TableHead>Status</TableHead>
                 <TableHead>Baterai</TableHead>
                 <TableHead>Sinyal</TableHead>
+                <TableHead>Temperature</TableHead>
+                <TableHead>Humidity</TableHead>
                 <TableHead>Pos</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
@@ -401,6 +413,18 @@ export function DeviceManagementPanel({
                       <span className="w-9 text-xs text-muted-foreground">
                         {device.signal}%
                       </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="min-w-28">
+                    <div className="flex items-center gap-2 text-sm">
+                      <ThermometerIcon className="interactive-icon size-4 text-muted-foreground" />
+                      <span>{formatTemperature(device.temperatureC)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="min-w-28">
+                    <div className="flex items-center gap-2 text-sm">
+                      <DropletsIcon className="interactive-icon size-4 text-muted-foreground" />
+                      <span>{formatHumidity(device.humidityPct)}</span>
                     </div>
                   </TableCell>
                   <TableCell>

@@ -33,19 +33,23 @@ export async function POST(request: Request) {
       templateId: template.id,
       areaName: parsed.data.areaName,
       status: "READY",
-      downloadUrl: "/api/reports/daily",
     },
+  });
+  const downloadUrl = `/api/reports/${report.id}/download?format=pdf`;
+  const readyReport = await prisma.report.update({
+    where: { id: report.id },
+    data: { downloadUrl },
   });
 
   return Response.json({
     ok: true,
     report: {
-      id: report.id,
+      id: readyReport.id,
       template: template.name,
-      area: report.areaName,
-      generatedAt: report.generatedAt,
-      status: report.status,
-      downloadUrl: report.downloadUrl,
+      area: readyReport.areaName,
+      generatedAt: readyReport.generatedAt,
+      status: readyReport.status,
+      downloadUrl: readyReport.downloadUrl,
     },
   });
 }

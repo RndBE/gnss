@@ -63,6 +63,8 @@ const riskScoreByStatus = {
 } as const;
 
 const nextWindowByArea: Record<string, string> = {
+  "Batang Roban": "19.30-21.30",
+  "Kendal Kaliwungu": "20.30-22.30",
   "Pekalongan Utara": "21.00-23.00",
   "Semarang Utara": "20.00-22.00",
   Sayung: "22.00-00.00",
@@ -77,6 +79,8 @@ const gnssRangeDays: Record<GnssRange, number | null> = {
 };
 
 const gnssAxisFactors: Record<string, { x: number; y: number; satellites: number; pdop: number }> = {
+  "gnss-btg-01": { x: -0.15, y: 0.08, satellites: 20, pdop: 1.28 },
+  "gnss-kdl-01": { x: 0.11, y: -0.09, satellites: 18, pdop: 1.49 },
   "gnss-pkl-01": { x: -0.18, y: 0.11, satellites: 21, pdop: 1.18 },
   "gnss-smg-02": { x: 0.14, y: -0.16, satellites: 19, pdop: 1.34 },
   "gnss-dmk-03": { x: 0.09, y: 0.13, satellites: 16, pdop: 1.72 },
@@ -263,25 +267,68 @@ function toPointOptionType(type: string): DevicePointOption["type"] {
 
 export async function getDeviceManagementItems(): Promise<DeviceManagementItem[]> {
   const devices = await getRawDevices();
+  const areaIds = Array.from(
+    new Set(
+      devices
+        .map((device) => device.point?.areaId)
+        .filter((areaId): areaId is string => Boolean(areaId)),
+    ),
+  );
+  const weatherReadings =
+    areaIds.length > 0
+      ? await prisma.weatherReading.findMany({
+          where: {
+            point: {
+              areaId: {
+                in: areaIds,
+              },
+            },
+          },
+          include: {
+            point: true,
+          },
+          orderBy: {
+            recordedAt: "desc",
+          },
+        })
+      : [];
+  const latestWeatherByArea = new Map<
+    string,
+    (typeof weatherReadings)[number]
+  >();
 
-  return devices.map((device) => ({
-    id: device.id,
-    code: device.code,
-    name: device.name,
-    type: toDeviceManagementType(device.type),
-    status: toDeviceStatus(device.status),
-    battery: device.battery,
-    signal: device.signal,
-    solarCharging: device.solarCharging,
-    firmwareVersion: device.firmwareVersion ?? "",
-    sensorStatus: device.sensorStatus ?? "",
-    lastDataReceived: formatDateTimeInput(device.lastDataReceived),
-    lastDataLabel: formatDayDateTime(device.lastDataReceived),
-    pointId: device.point?.id ?? "",
-    pointName: device.point?.name ?? "Belum terhubung",
-    pointType: device.point ? toPointOptionType(device.point.type) : "GNSS",
-    area: device.point?.area.name ?? "-",
-  }));
+  for (const reading of weatherReadings) {
+    if (!latestWeatherByArea.has(reading.point.areaId)) {
+      latestWeatherByArea.set(reading.point.areaId, reading);
+    }
+  }
+
+  return devices.map((device) => {
+    const weather = device.point
+      ? latestWeatherByArea.get(device.point.areaId)
+      : null;
+
+    return {
+      id: device.id,
+      code: device.code,
+      name: device.name,
+      type: toDeviceManagementType(device.type),
+      status: toDeviceStatus(device.status),
+      battery: device.battery,
+      signal: device.signal,
+      temperatureC: weather?.temperatureC ?? null,
+      humidityPct: weather?.humidityPct ?? null,
+      solarCharging: device.solarCharging,
+      firmwareVersion: device.firmwareVersion ?? "",
+      sensorStatus: device.sensorStatus ?? "",
+      lastDataReceived: formatDateTimeInput(device.lastDataReceived),
+      lastDataLabel: formatDayDateTime(device.lastDataReceived),
+      pointId: device.point?.id ?? "",
+      pointName: device.point?.name ?? "Belum terhubung",
+      pointType: device.point ? toPointOptionType(device.point.type) : "GNSS",
+      area: device.point?.area.name ?? "-",
+    };
+  });
 }
 
 export async function getDevicePointOptions(): Promise<DevicePointOption[]> {
@@ -1511,7 +1558,13 @@ export async function getGeneratedReports(): Promise<GeneratedReport[]> {
     area: report.areaName,
     status: statusLabels[report.status],
     generatedAt: formatDayDateTime(report.generatedAt),
-    downloadUrl: report.downloadUrl,
+    formats: Array.isArray(report.template.formats)
+      ? report.template.formats.filter((format): format is string => typeof format === "string")
+      : [],
+    downloadUrl:
+      report.status === "READY"
+        ? `/api/reports/${report.id}/download?format=pdf`
+        : null,
   }));
 }
 

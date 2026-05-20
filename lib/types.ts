@@ -94,6 +94,8 @@ export type DeviceManagementItem = {
   status: DeviceStatus;
   battery: number;
   signal: number;
+  temperatureC: number | null;
+  humidityPct: number | null;
   solarCharging: boolean;
   firmwareVersion: string;
   sensorStatus: string;
@@ -361,6 +363,7 @@ export type GeneratedReport = {
   area: string;
   status: "Queued" | "Ready" | "Failed";
   generatedAt: string;
+  formats: string[];
   downloadUrl: string | null;
 };
 

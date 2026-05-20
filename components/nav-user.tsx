@@ -21,9 +21,7 @@ import {
   BellIcon,
   ChevronsUpDownIcon,
   FileChartColumnIcon,
-  LogOutIcon,
   Settings2Icon,
-  UserRoundIcon,
 } from "lucide-react"
 
 export function NavUser({
@@ -94,16 +92,7 @@ export function NavUser({
                 <BellIcon />
                 Alarm & Event
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <UserRoundIcon />
-                Operator
-              </DropdownMenuItem>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link href="/login" />}>
-              <LogOutIcon />
-              Keluar
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

@@ -1,6 +1,7 @@
 import { Database } from "lucide-react";
 
 import { AppShell } from "@/components/dashboard/app-shell";
+import { PasswordSettingsForm } from "@/components/dashboard/password-settings-form";
 import {
   Card,
   CardContent,
@@ -42,6 +43,8 @@ export default async function PengaturanPage() {
       updatedAt={summary.updatedAt}
     >
       <div className="grid gap-4">
+        <PasswordSettingsForm />
+
         <Card className="interactive-card">
           <CardHeader>
             <CardTitle>Threshold Awal</CardTitle>
