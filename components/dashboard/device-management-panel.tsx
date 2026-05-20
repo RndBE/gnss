@@ -70,12 +70,8 @@ type DeviceFormState = {
   name: string
   type: PrismaDeviceType
   status: PrismaDeviceStatus
-  battery: string
-  signal: string
-  solarCharging: string
   firmwareVersion: string
   sensorStatus: string
-  lastDataReceived: string
   pointId: string
 }
 
@@ -105,6 +101,12 @@ const eventStateToForm: Record<EventState, PrismaEventState> = {
   Open: "OPEN",
   "In Progress": "IN_PROGRESS",
   Resolved: "RESOLVED",
+}
+
+const eventStateClasses: Record<EventState, string> = {
+  Open: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-50",
+  "In Progress": "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-50",
+  Resolved: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50",
 }
 
 const deviceTypeItems: Array<{ label: string; value: PrismaDeviceType }> = [
@@ -141,12 +143,8 @@ const emptyDeviceForm: DeviceFormState = {
   name: "",
   type: "LOGGER",
   status: "ONLINE",
-  battery: "80",
-  signal: "80",
-  solarCharging: "true",
   firmwareVersion: "",
   sensorStatus: "",
-  lastDataReceived: "",
   pointId: "",
 }
 
@@ -156,12 +154,8 @@ function deviceToForm(device: DeviceManagementItem): DeviceFormState {
     name: device.name,
     type: device.type,
     status: deviceStatusToForm[device.status],
-    battery: String(device.battery),
-    signal: String(device.signal),
-    solarCharging: String(device.solarCharging),
     firmwareVersion: device.firmwareVersion,
     sensorStatus: device.sensorStatus,
-    lastDataReceived: device.lastDataReceived,
     pointId: device.pointId,
   }
 }
@@ -218,7 +212,6 @@ export function DeviceManagementPanel({
   const [editingMaintenance, setEditingMaintenance] = useState<MaintenanceLog | null>(null)
   const [deviceForm, setDeviceForm] = useState<DeviceFormState>({
     ...emptyDeviceForm,
-    lastDataReceived: nowInputValue(),
   })
   const [maintenanceForm, setMaintenanceForm] = useState<MaintenanceFormState>(
     defaultMaintenanceForm(devices),
@@ -228,7 +221,7 @@ export function DeviceManagementPanel({
 
   function openNewDevice() {
     setEditingDevice(null)
-    setDeviceForm({ ...emptyDeviceForm, lastDataReceived: nowInputValue() })
+    setDeviceForm({ ...emptyDeviceForm })
     setMessage(null)
     setDeviceSheetOpen(true)
   }
@@ -265,9 +258,6 @@ export function DeviceManagementPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...deviceForm,
-        battery: Number(deviceForm.battery),
-        signal: Number(deviceForm.signal),
-        solarCharging: deviceForm.solarCharging === "true",
         pointId: deviceForm.pointId || null,
       }),
     })
@@ -354,7 +344,7 @@ export function DeviceManagementPanel({
             <div>
               <CardTitle>Status Perangkat</CardTitle>
               <CardDescription>
-                Tambah, ubah status, telemetry, relasi pos, dan data terakhir.
+                Tambah perangkat, ubah status operasional, firmware, dan relasi pos.
               </CardDescription>
             </div>
             <Button onClick={openNewDevice} size="sm">
@@ -489,7 +479,9 @@ export function DeviceManagementPanel({
                     {log.schedule} · {log.technician}
                   </p>
                 </div>
-                <Badge>{log.state}</Badge>
+                <Badge className={eventStateClasses[log.state]} variant="outline">
+                  {log.state}
+                </Badge>
               </div>
               <p className="mt-3 text-sm text-muted-foreground">{log.note}</p>
               <div className="mt-4 flex justify-end gap-2">
@@ -523,7 +515,7 @@ export function DeviceManagementPanel({
                 {editingDevice ? "Edit Perangkat" : "Tambah Perangkat"}
               </SheetTitle>
               <SheetDescription>
-                Data ini tersimpan ke tabel perangkat.
+                Metadata perangkat. Nilai baterai, sinyal, panel, dan data terakhir mengikuti telemetry.
               </SheetDescription>
             </SheetHeader>
             <div className="grid gap-4 px-4">
@@ -604,87 +596,6 @@ export function DeviceManagementPanel({
                       </SelectGroup>
                     </SelectContent>
                   </Select>
-                </Field>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field>
-                  <Label htmlFor="device-battery">Baterai (%)</Label>
-                  <Input
-                    id="device-battery"
-                    max={100}
-                    min={0}
-                    required
-                    type="number"
-                    value={deviceForm.battery}
-                    onChange={(event) =>
-                      setDeviceForm((form) => ({
-                        ...form,
-                        battery: event.target.value,
-                      }))
-                    }
-                  />
-                </Field>
-                <Field>
-                  <Label htmlFor="device-signal">Sinyal (%)</Label>
-                  <Input
-                    id="device-signal"
-                    max={100}
-                    min={0}
-                    required
-                    type="number"
-                    value={deviceForm.signal}
-                    onChange={(event) =>
-                      setDeviceForm((form) => ({
-                        ...form,
-                        signal: event.target.value,
-                      }))
-                    }
-                  />
-                </Field>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field>
-                  <Label>Panel surya</Label>
-	                  <Select
-	                    value={deviceForm.solarCharging}
-	                    onValueChange={(value) =>
-	                      setDeviceForm((form) => ({
-	                        ...form,
-	                        solarCharging: value ?? "true",
-	                      }))
-	                    }
-                    items={[
-                      { label: "Charging", value: "true" },
-                      { label: "Tidak charging", value: "false" },
-                    ]}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="true">Charging</SelectItem>
-                        <SelectItem value="false">Tidak charging</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field>
-                  <Label htmlFor="device-last-data">Data terakhir</Label>
-                  <Input
-                    id="device-last-data"
-                    required
-                    type="datetime-local"
-                    value={deviceForm.lastDataReceived}
-                    onChange={(event) =>
-                      setDeviceForm((form) => ({
-                        ...form,
-                        lastDataReceived: event.target.value,
-                      }))
-                    }
-                  />
                 </Field>
               </div>
 

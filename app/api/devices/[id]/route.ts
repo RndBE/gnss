@@ -10,29 +10,14 @@ const deviceSchema = z.object({
   name: z.string().trim().min(2),
   type: z.enum(["GNSS", "AWLR", "CCTV", "LOGGER", "WEATHER"]),
   status: z.enum(["ONLINE", "WEAK", "OFFLINE", "MAINTENANCE"]),
-  battery: z.coerce.number().int().min(0).max(100),
-  signal: z.coerce.number().int().min(0).max(100),
-  solarCharging: z.coerce.boolean(),
   firmwareVersion: z.string().trim().optional().nullable(),
   sensorStatus: z.string().trim().optional().nullable(),
-  lastDataReceived: z.string().trim().min(1),
   pointId: z.string().trim().optional().nullable(),
 });
 
 type DeviceRouteContext = {
   params: Promise<{ id: string }>;
 };
-
-function parseJakartaDateTime(value: string) {
-  const normalized = value.length === 16 ? `${value}:00` : value;
-  const date = new Date(`${normalized}+07:00`);
-
-  if (Number.isNaN(date.getTime())) {
-    throw new Error("Tanggal data terakhir tidak valid.");
-  }
-
-  return date;
-}
 
 function normalizeNullable(value: string | null | undefined) {
   return value?.trim() ? value.trim() : null;
@@ -59,12 +44,8 @@ export async function PATCH(request: Request, context: DeviceRouteContext) {
         name: data.name,
         type: data.type,
         status: data.status,
-        battery: data.battery,
-        signal: data.signal,
-        solarCharging: data.solarCharging,
         firmwareVersion: normalizeNullable(data.firmwareVersion),
         sensorStatus: normalizeNullable(data.sensorStatus),
-        lastDataReceived: parseJakartaDateTime(data.lastDataReceived),
         pointId: normalizeNullable(data.pointId),
       },
     });

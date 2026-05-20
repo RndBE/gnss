@@ -104,8 +104,8 @@ function TelemetryValue({
 
 export function DataLoggerList({ loggers }: DataLoggerListProps) {
   return (
-    <Card className="interactive-card border-sky-100 bg-gradient-to-br from-card via-card to-sky-50/45">
-      <CardHeader className="border-b border-sky-100 bg-gradient-to-r from-sky-50/75 via-card to-emerald-50/65 pb-4">
+    <Card className="interactive-card">
+      <CardHeader className="border-b pb-4">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
