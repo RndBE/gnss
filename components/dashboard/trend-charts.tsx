@@ -29,18 +29,18 @@ type TrendChartsProps = {
 
 export function TrendCharts({ trend, tide }: TrendChartsProps) {
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      <Card>
-        <CardHeader>
+    <div className="grid min-w-0 gap-3 content-start">
+      <Card className="min-w-0">
+        <CardHeader className="pb-2 px-3">
           <div>
-            <CardTitle>Tren Penurunan Tanah</CardTitle>
-            <CardDescription>
-              Laju vertikal GNSS dalam cm/tahun
+            <CardTitle className="text-sm">Tren Penurunan Tanah</CardTitle>
+            <CardDescription className="text-xs">
+              Laju vertikal GNSS (cm/thn)
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="h-72">
+        <CardContent className="min-w-0 px-2 pb-2">
+          <div className="h-52 min-h-52 min-w-0">
             <ResponsiveContainer height="100%" width="100%">
               <LineChart
                 data={trend}
@@ -94,17 +94,17 @@ export function TrendCharts({ trend, tide }: TrendChartsProps) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
+      <Card className="min-w-0">
+        <CardHeader className="pb-2 px-3">
           <div>
-            <CardTitle>Muka Air Laut</CardTitle>
-            <CardDescription>
-              AWLR real-time terhadap ambang rob
+            <CardTitle className="text-sm">Muka Air Laut</CardTitle>
+            <CardDescription className="text-xs">
+              AWLR real-time vs ambang rob
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="h-72">
+        <CardContent className="min-w-0 px-2 pb-2">
+          <div className="h-52 min-h-52 min-w-0">
             <ResponsiveContainer height="100%" width="100%">
               <AreaChart
                 data={tide}

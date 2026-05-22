@@ -202,11 +202,11 @@ export function AppSidebar({
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="group-data-[collapsible=icon]:hidden">
-        <div className="flex h-14 items-center justify-center px-2 group-data-[collapsible=icon]:px-0">
+      <SidebarHeader className="py-2 group-data-[collapsible=icon]:hidden">
+        <div className="flex items-center justify-center px-4">
           <Image
             alt="Beacon Engineering"
-            className="h-10 w-auto max-w-full object-contain"
+            className="h-auto w-full max-h-7 object-contain"
             priority
             src={logoBeacon}
           />

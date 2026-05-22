@@ -23,11 +23,15 @@ import type {
   DataLoggerFeed,
   DeviceTelemetry,
   GeneratedReport,
+  GnssAnomaly,
   GnssComparisonPoint,
   GnssMetric,
   GnssMonitoringData,
   GnssParameter,
+  GnssQualityStatus,
+  GnssQualitySummary,
   GnssRange,
+  GnssRegressionSummary,
   GnssStation,
   GnssStationMonitoring,
   GnssTrendPoint,
@@ -91,6 +95,7 @@ const gnssParameterLabels: Record<GnssParameter, { label: string; unit: string }
   y: { label: "Y / Northing", unit: "mm" },
   z: { label: "Z / Up", unit: "mm" },
   velocity: { label: "Velocity vertikal", unit: "cm/tahun" },
+  subsidence: { label: "Akumulasi turun", unit: "cm" },
   pdop: { label: "PDOP", unit: "" },
   fixRatio: { label: "Fix ratio", unit: "%" },
 };
@@ -659,6 +664,7 @@ function normalizeGnssParameter(value: string | null | undefined): GnssParameter
     value === "y" ||
     value === "z" ||
     value === "velocity" ||
+    value === "subsidence" ||
     value === "pdop" ||
     value === "fixRatio"
   ) {
@@ -1023,6 +1029,260 @@ function toGnssMonitoringStation(station: RawGnssMonitoringStation): GnssStation
   };
 }
 
+function getQualityStatus(score: number): GnssQualityStatus {
+  if (score >= 80) return "Valid";
+  if (score >= 60) return "Suspect";
+  return "Bad";
+}
+
+function getLatestGapHours(latest: GnssTrendPoint | null) {
+  if (!latest) return null;
+
+  const recordedAt = new Date(latest.recordedAt).getTime();
+  if (Number.isNaN(recordedAt)) return null;
+
+  return round(Math.max(0, Date.now() - recordedAt) / (1000 * 60 * 60), 1);
+}
+
+function buildGnssQualitySummary(
+  latest: GnssTrendPoint | null,
+  device: GnssStationMonitoring["device"],
+): GnssQualitySummary {
+  const reasons: string[] = [];
+  let penalty = latest ? 0 : 45;
+  const gapHours = getLatestGapHours(latest);
+
+  if (!latest) {
+    reasons.push("belum ada observasi GNSS");
+  } else {
+    if (latest.pdop > 3) {
+      penalty += 25;
+      reasons.push("PDOP tinggi");
+    } else if (latest.pdop > 2) {
+      penalty += 12;
+      reasons.push("PDOP mulai naik");
+    }
+
+    if (latest.fixRatio < 85) {
+      penalty += 30;
+      reasons.push("fix ratio rendah");
+    } else if (latest.fixRatio < 95) {
+      penalty += 15;
+      reasons.push("fix ratio menurun");
+    }
+
+    if (latest.satellites < 10) {
+      penalty += 25;
+      reasons.push("satelit terlacak minim");
+    } else if (latest.satellites < 15) {
+      penalty += 12;
+      reasons.push("jumlah satelit terbatas");
+    }
+  }
+
+  if (device) {
+    if (device.signal < 40) {
+      penalty += 20;
+      reasons.push("sinyal telemetry lemah");
+    } else if (device.signal < 60) {
+      penalty += 10;
+      reasons.push("sinyal telemetry sedang");
+    }
+
+    if (device.battery < 20) {
+      penalty += 20;
+      reasons.push("baterai kritis");
+    } else if (device.battery < 40) {
+      penalty += 10;
+      reasons.push("baterai rendah");
+    }
+  } else {
+    penalty += 15;
+    reasons.push("logger belum terhubung");
+  }
+
+  if (gapHours != null) {
+    if (gapHours > 72) {
+      penalty += 30;
+      reasons.push("data terakhir lebih dari 72 jam");
+    } else if (gapHours > 24) {
+      penalty += 15;
+      reasons.push("data terakhir lebih dari 24 jam");
+    }
+  }
+
+  const score = Math.max(0, Math.min(100, Math.round(100 - penalty)));
+  const status = getQualityStatus(score);
+
+  return {
+    score,
+    status,
+    label:
+      status === "Valid"
+        ? "Data layak analisis"
+        : status === "Suspect"
+          ? "Perlu validasi"
+          : "Jangan dipakai tanpa cek lapangan",
+    detail:
+      reasons.length > 0
+        ? reasons.slice(0, 3).join(", ")
+        : "PDOP, fix ratio, satelit, dan telemetry dalam batas operasi",
+    pdop: latest?.pdop ?? null,
+    fixRatio: latest?.fixRatio ?? null,
+    satellites: latest?.satellites ?? null,
+    signal: device?.signal ?? null,
+    battery: device?.battery ?? null,
+    dataGapHours: gapHours,
+  };
+}
+
+function average(values: number[]) {
+  if (values.length === 0) return 0;
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function buildGnssRegressionSummary(rows: GnssTrendPoint[]): GnssRegressionSummary {
+  if (rows.length < 2) {
+    return {
+      status: "Stabil",
+      slopeMmPerDay: 0,
+      velocityCmYear: 0,
+      velocityChangeCmYear: 0,
+      rSquared: 0,
+      confidence: "Rendah",
+      detail: "Data belum cukup untuk regresi tren",
+    };
+  }
+
+  const start = new Date(rows[0].recordedAt).getTime();
+  const points = rows.map((row) => ({
+    x: (new Date(row.recordedAt).getTime() - start) / (1000 * 60 * 60 * 24),
+    y: row.z,
+  }));
+  const meanX = average(points.map((point) => point.x));
+  const meanY = average(points.map((point) => point.y));
+  const denominator = points.reduce(
+    (total, point) => total + (point.x - meanX) ** 2,
+    0,
+  );
+  const slope =
+    denominator === 0
+      ? 0
+      : points.reduce(
+          (total, point) => total + (point.x - meanX) * (point.y - meanY),
+          0,
+        ) / denominator;
+  const intercept = meanY - slope * meanX;
+  const residual = points.reduce(
+    (total, point) => total + (point.y - (slope * point.x + intercept)) ** 2,
+    0,
+  );
+  const totalVariance = points.reduce(
+    (total, point) => total + (point.y - meanY) ** 2,
+    0,
+  );
+  const rSquared =
+    totalVariance === 0 ? 1 : Math.max(0, Math.min(1, 1 - residual / totalVariance));
+  const midpoint = Math.max(1, Math.floor(rows.length / 2));
+  const firstVelocity = average(rows.slice(0, midpoint).map((row) => row.velocity));
+  const secondVelocity = average(rows.slice(midpoint).map((row) => row.velocity));
+  const velocityChange = secondVelocity - firstVelocity;
+  const status: GnssRegressionSummary["status"] =
+    velocityChange <= -0.5
+      ? "Memburuk"
+      : velocityChange >= 0.5
+        ? "Membaik"
+        : "Stabil";
+  const confidence: GnssRegressionSummary["confidence"] =
+    rows.length >= 12 && rSquared >= 0.75
+      ? "Tinggi"
+      : rows.length >= 6 && rSquared >= 0.45
+        ? "Sedang"
+        : "Rendah";
+
+  return {
+    status,
+    slopeMmPerDay: round(slope, 3),
+    velocityCmYear: round((slope * 365) / 10, 2),
+    velocityChangeCmYear: round(velocityChange, 2),
+    rSquared: round(rSquared, 2),
+    confidence,
+    detail: `Regresi Z ${rows.length} sampel; perubahan velocity ${formatSignedValue(
+      velocityChange,
+      "cm/tahun",
+      2,
+    )}`,
+  };
+}
+
+function anomalySeverity(value: number, warning: number, critical: number): GnssAnomaly["severity"] {
+  if (Math.abs(value) >= critical) return "Critical";
+  if (Math.abs(value) >= warning) return "Warning";
+  return "Info";
+}
+
+function buildGnssAnomalies(
+  rows: GnssTrendPoint[],
+  quality: GnssQualitySummary,
+): GnssAnomaly[] {
+  const anomalies: GnssAnomaly[] = [];
+
+  for (let index = 1; index < rows.length; index += 1) {
+    const previous = rows[index - 1];
+    const current = rows[index];
+    const deltaZ = current.z - previous.z;
+    const deltaVelocity = current.velocity - previous.velocity;
+
+    if (Math.abs(deltaZ) >= 20) {
+      const severity = anomalySeverity(deltaZ, 20, 50);
+      anomalies.push({
+        id: `${current.recordedAt}-z`,
+        period: current.period,
+        recordedAt: current.recordedAt,
+        severity,
+        parameter: "Z",
+        delta: formatSignedValue(deltaZ, "mm"),
+        message:
+          severity === "Critical"
+            ? "Lonjakan vertikal kritis, perlu cek antena atau receiver"
+            : "Lonjakan vertikal melewati batas normal",
+      });
+    }
+
+    if (Math.abs(deltaVelocity) >= 1.2) {
+      const severity = anomalySeverity(deltaVelocity, 1.2, 3);
+      anomalies.push({
+        id: `${current.recordedAt}-velocity`,
+        period: current.period,
+        recordedAt: current.recordedAt,
+        severity,
+        parameter: "Velocity",
+        delta: formatSignedValue(deltaVelocity, "cm/tahun"),
+        message:
+          severity === "Critical"
+            ? "Perubahan velocity kritis dibanding observasi sebelumnya"
+            : "Perubahan velocity perlu divalidasi",
+      });
+    }
+  }
+
+  if (quality.status !== "Valid") {
+    anomalies.push({
+      id: "quality-latest",
+      period: rows[rows.length - 1]?.period ?? "-",
+      recordedAt: rows[rows.length - 1]?.recordedAt ?? new Date().toISOString(),
+      severity: quality.status === "Bad" ? "Critical" : "Warning",
+      parameter: "Quality",
+      delta: `${quality.score}/100`,
+      message: quality.detail,
+    });
+  }
+
+  return anomalies
+    .sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime())
+    .slice(0, 8);
+}
+
 function buildGnssMetrics(
   station: GnssStationMonitoring,
   latest: GnssTrendPoint | null,
@@ -1053,6 +1313,12 @@ function buildGnssMetrics(
       detail: `Total ${station.totalSubsidence}`,
     },
     {
+      key: "subsidence",
+      label: "Akumulasi turun",
+      value: formatSignedValue(latest?.subsidence, "cm"),
+      detail: `Total pos ${station.totalSubsidence}`,
+    },
+    {
       key: "velocity",
       label: "Velocity",
       value: formatSignedValue(latest?.velocity, "cm/tahun"),
@@ -1078,6 +1344,10 @@ function toGnssComparisonPoint(station: RawGnssMonitoringStation): GnssCompariso
   const latest = latestReading
     ? toGnssTrendPoint(latestReading, station.code, station.gnssReadings.length - 1)
     : null;
+  const monitoringStation = toGnssMonitoringStation(station);
+  const quality = buildGnssQualitySummary(latest, monitoringStation.device);
+  const subsidence = station.totalSubsidenceCm ?? latest?.subsidence ?? 0;
+  const velocity = latest?.velocity ?? 0;
 
   return {
     id: station.code,
@@ -1087,7 +1357,10 @@ function toGnssComparisonPoint(station: RawGnssMonitoringStation): GnssCompariso
     x: latest?.x ?? 0,
     y: latest?.y ?? 0,
     z: latest?.z ?? 0,
-    velocity: latest?.velocity ?? 0,
+    velocity,
+    subsidence,
+    qualityScore: quality.score,
+    qualityStatus: quality.status,
     lastUpdate: formatClock(station.lastUpdate),
   };
 }
@@ -1138,6 +1411,11 @@ export async function getGnssMonitoringData(filters: {
   const firstValue = getTrendValue(first, parameter);
   const latestRawValue = getTrendValue(latest, parameter);
   const velocityThresholds = getGnssVelocityThresholdProfile(selected);
+  const selectedStation = toGnssMonitoringStation(selected);
+  const quality = buildGnssQualitySummary(lastTrend, selectedStation.device);
+  const trendAnalysis = buildGnssRegressionSummary(rangedTrend);
+  const anomalies = buildGnssAnomalies(rangedTrend, quality);
+  const comparison = stations.map(toGnssComparisonPoint);
 
   return {
     stations: stations.map((station) => ({
@@ -1146,14 +1424,17 @@ export async function getGnssMonitoringData(filters: {
       area: station.area.name,
       status: toRiskStatus(station.status),
     })),
-    selectedStation: toGnssMonitoringStation(selected),
+    selectedStation,
     selectedParameter: parameter,
     selectedRange: range,
     selectedGranularity: granularity,
     thresholds: parameter === "velocity" ? velocityThresholds : undefined,
     trend: visibleTrend,
-    metrics: buildGnssMetrics(toGnssMonitoringStation(selected), latest, previous),
-    comparison: stations.map(toGnssComparisonPoint),
+    metrics: buildGnssMetrics(selectedStation, latest, previous),
+    comparison,
+    quality,
+    trendAnalysis,
+    anomalies,
     analysis: {
       latestValue,
       deltaFromPrevious:

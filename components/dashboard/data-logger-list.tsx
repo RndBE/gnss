@@ -69,6 +69,7 @@ const gnssAnalysisParameters = new Set([
   "y",
   "z",
   "velocity",
+  "subsidence",
   "pdop",
   "fixRatio",
 ]);

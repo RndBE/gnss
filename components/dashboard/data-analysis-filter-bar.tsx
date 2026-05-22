@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CalendarRange, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
@@ -38,6 +39,7 @@ type DataAnalysisFilterBarProps = {
   selectedDateFrom: string;
   selectedDateTo: string;
   selectedGranularity: AnalysisGranularity;
+  action?: React.ReactNode;
 };
 
 const modeItems: Array<{ label: string; value: DataAnalysisMode }> = [
@@ -51,6 +53,7 @@ const parameterItems: Record<DataAnalysisMode, ParameterOption[]> = {
     { label: "Y / Northing", value: "y" },
     { label: "Z / Up", value: "z" },
     { label: "Velocity", value: "velocity" },
+    { label: "Akumulasi turun", value: "subsidence" },
     { label: "PDOP", value: "pdop" },
     { label: "Fix ratio", value: "fixRatio" },
   ],
@@ -84,6 +87,7 @@ export function DataAnalysisFilterBar({
   selectedDateFrom,
   selectedDateTo,
   selectedGranularity,
+  action,
 }: DataAnalysisFilterBarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -346,6 +350,7 @@ export function DataAnalysisFilterBar({
           <RotateCcw />
           Reset
         </Button>
+        {action}
       </div>
     </div>
   );

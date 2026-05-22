@@ -49,6 +49,10 @@ const chartConfig = {
     label: "Velocity",
     color: "var(--chart-4)",
   },
+  subsidence: {
+    label: "Akumulasi turun",
+    color: "var(--chart-1)",
+  },
   pdop: {
     label: "PDOP",
     color: "var(--chart-5)",
@@ -64,6 +68,7 @@ const axisLabels: Record<GnssParameter, string> = {
   y: "mm",
   z: "mm",
   velocity: "cm/tahun",
+  subsidence: "cm",
   pdop: "PDOP",
   fixRatio: "%",
 };
@@ -79,6 +84,8 @@ export function GnssParameterChart({
       ? [-10, 0]
       : parameter === "z"
         ? [-90, 0]
+        : parameter === "subsidence"
+          ? [-40, 0]
         : parameter === "pdop"
           ? [0, 4]
           : parameter === "fixRatio"

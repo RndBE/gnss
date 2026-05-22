@@ -48,6 +48,7 @@ const chartConfig = {
   y: { label: "Y / Northing", color: "var(--chart-2)" },
   z: { label: "Z / Up", color: "var(--chart-3)" },
   velocity: { label: "Velocity", color: "var(--chart-4)" },
+  subsidence: { label: "Akumulasi turun", color: "var(--chart-1)" },
   pdop: { label: "PDOP", color: "var(--chart-5)" },
   fixRatio: { label: "Fix ratio", color: "var(--chart-2)" },
   waterLevel: { label: "Muka air", color: "var(--chart-1)" },
@@ -61,6 +62,7 @@ const axisLabels: Record<GnssParameter | AwlrParameter, string> = {
   y: "mm",
   z: "mm",
   velocity: "cm/tahun",
+  subsidence: "cm",
   pdop: "PDOP",
   fixRatio: "%",
   waterLevel: "m",
@@ -104,6 +106,16 @@ function getDomain(
     return [Number((min - padding).toFixed(1)), 0];
   }
   if (parameter === "z") return [-90, 0];
+  if (parameter === "subsidence") {
+    const readings = data
+      .map((item) => ("subsidence" in item ? item.subsidence : null))
+      .filter((value): value is number => typeof value === "number");
+    const min = readings.length > 0 ? Math.min(...readings, 0) : -10;
+    const max = readings.length > 0 ? Math.max(...readings, 0) : 0;
+    const padding = Math.max((max - min) * 0.14, 0.8);
+
+    return [Number((min - padding).toFixed(1)), Number((max + padding).toFixed(1))];
+  }
   if (parameter === "pdop") return [0, 4];
   if (parameter === "fixRatio") return [50, 100];
   return ["auto", "auto"];
@@ -143,23 +155,22 @@ export function DataAnalysisChart({
       : [];
 
   return (
-    <Card className="@container/card interactive-card">
-      <CardHeader>
+    <Card className="@container/card interactive-card min-w-0">
+      <CardHeader className="pb-2 px-3">
         <div>
-          <CardTitle>Analisis Tren Per Pos</CardTitle>
-          <CardDescription>
-            {stationName} - {chartConfig[parameter].label} -{" "}
-            {granularity === "daily" ? "Harian" : "Per jam"}
+          <CardTitle className="text-sm">Analisis Tren Per Pos</CardTitle>
+          <CardDescription className="text-xs">
+            {stationName} · {chartConfig[parameter].label} · {granularity === "daily" ? "Harian" : "Per jam"}
           </CardDescription>
         </div>
         <CardAction className="text-sm font-semibold tabular-nums">
           {latestValue}
         </CardAction>
       </CardHeader>
-      <CardContent className="px-2 pt-4 sm:px-6">
+      <CardContent className="min-w-0 px-2 pb-3 pt-1 sm:px-4">
         <ChartContainer
           config={chartConfig}
-          className="aspect-auto h-[320px] w-full"
+          className="aspect-auto h-[240px] min-h-[240px] w-full min-w-0"
         >
           <AreaChart data={data} margin={{ left: 8, right: 8 }}>
             <defs>

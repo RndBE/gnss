@@ -35,16 +35,6 @@ const panturaBounds: LatLngBoundsExpression = [
   [-6.72, 110.75],
 ]
 
-const panturaCoastline: [number, number][] = [
-  [-6.84, 109.61],
-  [-6.83, 109.68],
-  [-6.82, 109.82],
-  [-6.86, 110.05],
-  [-6.91, 110.25],
-  [-6.93, 110.42],
-  [-6.88, 110.62],
-]
-
 const riskColors: Record<RiskStatus, string> = {
   Normal: "#10b981",
   Waspada: "#f59e0b",
@@ -159,8 +149,6 @@ export default function LeafletRiskMap({
     () => new Set(riskStatuses)
   )
   const [layers, setLayers] = useState({
-    coastline: true,
-    riskZones: true,
     infrastructure: true,
   })
   const [controlsOpen, setControlsOpen] = useState(false)
@@ -207,7 +195,7 @@ export default function LeafletRiskMap({
   }
 
   return (
-    <div className="relative h-[560px] overflow-hidden md:h-[640px]">
+    <div className="relative h-full min-h-[400px] overflow-hidden">
       <MapContainer
         bounds={panturaBounds}
         boundsOptions={{ padding: [26, 26] }}
@@ -224,36 +212,6 @@ export default function LeafletRiskMap({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {layers.riskZones &&
-          panturaCoastline.map((position, index) => (
-            <CircleMarker
-              center={position}
-              key={`${position[0]}-${position[1]}`}
-              pathOptions={{
-                color: index === 1 || index === 5 ? "#dc2626" : "#f97316",
-                fillColor: index === 1 || index === 5 ? "#ef4444" : "#fb923c",
-                fillOpacity: 0.2,
-                opacity: 0.5,
-                weight: 1,
-              }}
-              radius={index === 2 || index === 5 ? 28 : 18}
-            />
-          ))}
-        {layers.coastline &&
-          panturaCoastline.map((position) => (
-            <CircleMarker
-              center={position}
-              key={`coast-${position[0]}-${position[1]}`}
-              pathOptions={{
-                color: "#0284c7",
-                fillColor: "#0ea5e9",
-                fillOpacity: 0.18,
-                opacity: 0.55,
-                weight: 1,
-              }}
-              radius={7}
-            />
-          ))}
         {layers.infrastructure &&
           infrastructurePoints.map((item) => (
             <CircleMarker
@@ -351,24 +309,18 @@ export default function LeafletRiskMap({
             </div>
           </div>
           <div className="mt-3 grid gap-2">
-            {[
-              ["coastline", "Garis pesisir"],
-              ["riskZones", "Zona rob"],
-              ["infrastructure", "Infrastruktur"],
-            ].map(([key, label]) => (
-              <Label className="text-xs font-normal" key={key}>
-                <Checkbox
-                  checked={layers[key as keyof typeof layers]}
-                  onCheckedChange={(checked) => {
-                    setLayers((current) => ({
-                      ...current,
-                      [key]: checked === true,
-                    }))
-                  }}
-                />
-                {label}
-              </Label>
-            ))}
+            <Label className="text-xs font-normal">
+              <Checkbox
+                checked={layers.infrastructure}
+                onCheckedChange={(checked) => {
+                  setLayers((current) => ({
+                    ...current,
+                    infrastructure: checked === true,
+                  }))
+                }}
+              />
+              Infrastruktur
+            </Label>
           </div>
 
           <div className="mt-4 border-t pt-3">

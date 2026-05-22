@@ -138,7 +138,14 @@ export type GnssStation = {
   lastUpdate: string;
 };
 
-export type GnssParameter = "x" | "y" | "z" | "velocity" | "pdop" | "fixRatio";
+export type GnssParameter =
+  | "x"
+  | "y"
+  | "z"
+  | "velocity"
+  | "subsidence"
+  | "pdop"
+  | "fixRatio";
 
 export type GnssRange = "30d" | "90d" | "180d" | "all" | "custom";
 
@@ -180,6 +187,45 @@ export type GnssTrendPoint = {
   fixRatio: number;
 };
 
+export type GnssQualityStatus = "Valid" | "Suspect" | "Bad";
+
+export type GnssTrendStatus = "Membaik" | "Stabil" | "Memburuk";
+
+export type GnssAnomalySeverity = "Info" | "Warning" | "Critical";
+
+export type GnssQualitySummary = {
+  score: number;
+  status: GnssQualityStatus;
+  label: string;
+  detail: string;
+  pdop: number | null;
+  fixRatio: number | null;
+  satellites: number | null;
+  signal: number | null;
+  battery: number | null;
+  dataGapHours: number | null;
+};
+
+export type GnssRegressionSummary = {
+  status: GnssTrendStatus;
+  slopeMmPerDay: number;
+  velocityCmYear: number;
+  velocityChangeCmYear: number;
+  rSquared: number;
+  confidence: "Tinggi" | "Sedang" | "Rendah";
+  detail: string;
+};
+
+export type GnssAnomaly = {
+  id: string;
+  period: string;
+  recordedAt: string;
+  severity: GnssAnomalySeverity;
+  parameter: "Z" | "Velocity" | "Quality";
+  delta: string;
+  message: string;
+};
+
 export type GnssMetric = {
   key: GnssParameter | "elevation" | "subsidence";
   label: string;
@@ -212,6 +258,9 @@ export type GnssComparisonPoint = {
   y: number;
   z: number;
   velocity: number;
+  subsidence: number;
+  qualityScore: number;
+  qualityStatus: GnssQualityStatus;
   lastUpdate: string;
 };
 
@@ -225,6 +274,9 @@ export type GnssMonitoringData = {
   trend: GnssTrendPoint[];
   metrics: GnssMetric[];
   comparison: GnssComparisonPoint[];
+  quality: GnssQualitySummary;
+  trendAnalysis: GnssRegressionSummary;
+  anomalies: GnssAnomaly[];
   analysis: {
     latestValue: string;
     deltaFromPrevious: string;

@@ -22,15 +22,15 @@ export function AppShell({
   contentPadding = true,
 }: AppShellProps) {
   const contentClassName = contentPadding
-    ? "flex w-full flex-col gap-4 px-4 py-4 md:gap-6 md:py-6 lg:px-6"
-    : "flex flex-col gap-4 py-4 md:gap-6 md:py-6"
+    ? "flex w-full flex-col gap-3 px-4 py-3 md:gap-4 md:py-4 lg:px-6"
+    : "flex flex-col gap-3 py-3 md:gap-4 md:py-4"
 
   return (
     <SidebarProvider
       style={
         {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 12)",
+          "--sidebar-width": "calc(var(--spacing) * 63)",
+          "--header-height": "calc(var(--spacing) * 11)",
         } as CSSProperties
       }
     >

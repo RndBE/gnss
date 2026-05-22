@@ -30,6 +30,7 @@ const parameterItems: Array<{ label: string; value: GnssParameter }> = [
   { label: "Y / Northing", value: "y" },
   { label: "Z / Up", value: "z" },
   { label: "Velocity", value: "velocity" },
+  { label: "Akumulasi turun", value: "subsidence" },
   { label: "PDOP", value: "pdop" },
   { label: "Fix ratio", value: "fixRatio" },
 ];
