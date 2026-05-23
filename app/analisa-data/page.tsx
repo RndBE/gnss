@@ -38,12 +38,14 @@ import {
   getDashboardSummary,
   getGnssMonitoringData,
 } from "@/lib/backend/queries";
+import { getTidalForecast, getTidalForecastPerStation, type TidalForecast } from "@/lib/backend/forecast";
 import { generateAwlrInsights, generateGnssInsights } from "@/lib/insights";
 import { InsightPanel } from "@/components/dashboard/insight-panel";
 import type {
   AnalysisGranularity,
   AwlrMetric,
   AwlrMonitoringData,
+  AwlrThresholdProfile,
   DataAnalysisMode,
   DeviceStatus,
   GnssAnomalySeverity,
@@ -461,6 +463,23 @@ function GnssAnomalyPanel({ data }: { data: GnssMonitoringData }) {
   );
 }
 
+function MetricBox({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("interactive-tile rounded-md bg-muted/45 px-2 py-1.5", className)}>
+      <p className="text-muted-foreground">{label}</p>
+      <p className="font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
 function AwlrObservations({ data }: { data: AwlrMonitoringData }) {
   return (
     <Card className="interactive-card">
@@ -549,7 +568,13 @@ function GnssComparison({ data }: { data: GnssMonitoringData }) {
   );
 }
 
-function AwlrComparison({ data }: { data: AwlrMonitoringData }) {
+function AwlrComparison({
+  data,
+  forecastMap,
+}: {
+  data: AwlrMonitoringData;
+  forecastMap: Map<string, TidalForecast>;
+}) {
   return (
     <Card className="interactive-card">
       <CardHeader className="pb-3">
@@ -557,50 +582,144 @@ function AwlrComparison({ data }: { data: AwlrMonitoringData }) {
         <CardDescription>Nilai terkini per lokasi AWLR</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 pb-3">
-        {data.comparison.map((item) => (
-          <div
-            className={cn(
-              "interactive-card rounded-lg border p-2.5",
-              item.id === data.selectedStation.id && "bg-muted/35",
-            )}
-            key={item.id}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-xs font-medium">{item.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {item.area} · {item.lastUpdate}
-                </p>
+        {data.comparison.map((item) => {
+          const isSelected = item.id === data.selectedStation.id;
+          const fc = forecastMap.get(item.id) ?? null;
+
+          const forecastTileClass = (val: number) =>
+            val >= item.awas
+              ? "border-red-200/70 bg-red-50/50 dark:bg-red-950/20"
+              : val >= item.siaga
+                ? "border-orange-200/70 bg-orange-50/50 dark:bg-orange-950/20"
+                : val >= item.waspada
+                  ? "border-amber-200/70 bg-amber-50/50 dark:bg-amber-950/20"
+                  : "border-sky-200/60 bg-sky-50/40 dark:bg-sky-950/20";
+
+          return (
+            <div
+              className={cn(
+                "interactive-card rounded-lg border p-2.5",
+                isSelected && "bg-muted/35",
+              )}
+              key={item.id}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-medium">{item.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {item.area} · {item.lastUpdate}
+                  </p>
+                </div>
+                <StatusBadge status={item.status} />
               </div>
-              <StatusBadge status={item.status} />
+              <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-xs">
+                <MetricBox label="Muka air"     value={formatMetersValue(item.waterLevel)} />
+                <MetricBox label="Margin Awas"  value={formatMetersValue(item.marginAwas)} />
+                <MetricBox label="Ambang Siaga" value={formatMetersValue(item.siaga)} />
+                <MetricBox label="Ambang Awas"  value={formatMetersValue(item.awas)} />
+                {fc && (
+                  <>
+                    <MetricBox
+                      label="Forecast 6h maks"
+                      value={`${fc.max6h.toFixed(3)} m`}
+                      className={forecastTileClass(fc.max6h)}
+                    />
+                    <MetricBox
+                      label="Forecast 72h maks"
+                      value={`${fc.max72h.toFixed(3)} m`}
+                      className={forecastTileClass(fc.max72h)}
+                    />
+                  </>
+                )}
+              </div>
             </div>
-            <div className="mt-1.5 grid grid-cols-2 gap-1.5 text-xs">
-              <MetricBox label="Muka air" value={formatMetersValue(item.waterLevel)} />
-              <MetricBox label="Margin Awas" value={formatMetersValue(item.marginAwas)} />
-              <MetricBox label="Ambang Siaga" value={formatMetersValue(item.siaga)} />
-              <MetricBox label="Ambang Awas" value={formatMetersValue(item.awas)} />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </CardContent>
     </Card>
   );
 }
 
-function MetricBox({
-  label,
-  value,
-  className,
+function AwlrForecastCard({
+  forecast,
+  thresholds,
 }: {
-  label: string;
-  value: string;
-  className?: string;
+  forecast: TidalForecast | null;
+  thresholds: AwlrThresholdProfile;
 }) {
+  if (!forecast) {
+    return (
+      <Card className="interactive-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Waves className="interactive-icon size-4 text-muted-foreground" />
+            Forecast Muka Air
+          </CardTitle>
+          <CardDescription>Model tidal harmonik</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+            API forecast tidak tersedia. Pastikan server RnD aktif.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const getForecastBadge = (max: number) => {
+    if (max >= thresholds.awas)    return { label: "Awas",    cls: "border-red-200 bg-red-50 text-red-700 hover:bg-red-50" };
+    if (max >= thresholds.siaga)   return { label: "Siaga",   cls: "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-50" };
+    if (max >= thresholds.waspada) return { label: "Waspada", cls: "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-50" };
+    return                                { label: "Normal",  cls: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50" };
+  };
+
+  const badge6h  = getForecastBadge(forecast.max6h);
+  const badge72h = getForecastBadge(forecast.max72h);
+
   return (
-    <div className={cn("interactive-tile rounded-md bg-muted/45 px-2 py-1.5", className)}>
-      <p className="text-muted-foreground">{label}</p>
-      <p className="font-semibold tabular-nums">{value}</p>
-    </div>
+    <Card className="interactive-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <Waves className="interactive-icon size-4 text-muted-foreground" />
+          Forecast Muka Air
+        </CardTitle>
+        <CardDescription>
+          Tidal harmonik · ±{forecast.rmse.toFixed(3)} m RMSE
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2 pb-3">
+        <div className="rounded-lg border bg-muted/25 p-2.5">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">6 Jam ke depan</span>
+            <Badge className={cn("border text-[11px]", badge6h.cls)} variant="outline">
+              {badge6h.label}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5 text-xs">
+            <MetricBox label="Jam ini"  value={`${forecast.next.toFixed(3)} m`} />
+            <MetricBox label="Maks 6h"  value={`${forecast.max6h.toFixed(3)} m`} />
+            <MetricBox label="Min 6h"   value={`${forecast.min6h.toFixed(3)} m`} />
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-muted/25 p-2.5">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">72 Jam ke depan</span>
+            <Badge className={cn("border text-[11px]", badge72h.cls)} variant="outline">
+              {badge72h.label}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 text-xs">
+            <MetricBox label="Maks 72h" value={`${forecast.max72h.toFixed(3)} m`} />
+            <MetricBox label="Min 72h"  value={`${forecast.min72h.toFixed(3)} m`} />
+          </div>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground">
+          Dibuat: {forecast.generatedAt} UTC · 32 konstituen harmonik
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -621,7 +740,11 @@ export default async function AnalisaDataPage({ searchParams }: AnalisaDataPageP
       }),
     ]);
 
-    const awlrInsights = generateAwlrInsights(data);
+    const forecastMap = await getTidalForecastPerStation(
+      data.comparison.map((s) => ({ id: s.id, latitude: s.latitude, longitude: s.longitude })),
+    );
+    const selectedForecast = forecastMap.get(data.selectedStation.id) ?? null;
+    const awlrInsights = generateAwlrInsights(data, selectedForecast);
 
     return (
       <AppShell
@@ -674,7 +797,10 @@ export default async function AnalisaDataPage({ searchParams }: AnalisaDataPageP
           </div>
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_380px]">
             <AwlrObservations data={data} />
-            <AwlrComparison data={data} />
+            <div className="flex flex-col gap-3">
+              <AwlrForecastCard forecast={selectedForecast} thresholds={data.thresholds} />
+              <AwlrComparison data={data} forecastMap={forecastMap} />
+            </div>
           </div>
         </div>
       </AppShell>

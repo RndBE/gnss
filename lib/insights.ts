@@ -1,3 +1,4 @@
+import type { TidalForecast } from "@/lib/backend/forecast";
 import type {
   AwlrMonitoringData,
   GnssMonitoringData,
@@ -120,7 +121,7 @@ export function generateGnssInsights(data: GnssMonitoringData): Insight[] {
   return insights;
 }
 
-export function generateAwlrInsights(data: AwlrMonitoringData): Insight[] {
+export function generateAwlrInsights(data: AwlrMonitoringData, forecast?: TidalForecast | null): Insight[] {
   const { selectedStation, trend, analysis, comparison } = data;
   const insights: Insight[] = [];
 
@@ -194,6 +195,44 @@ export function generateAwlrInsights(data: AwlrMonitoringData): Insight[] {
       text: isCurrentHighest
         ? `Pos ini memiliki muka air tertinggi (${highest.waterLevel.toFixed(2)} m) di antara ${comparison.length} stasiun AWLR.`
         : `${highest.name} memiliki muka air tertinggi saat ini (${highest.waterLevel.toFixed(2)} m) di antara ${comparison.length} stasiun.`,
+      severity,
+    });
+  }
+
+  // 5. Forecast 6 jam
+  if (forecast) {
+    const { next, max6h, min6h } = forecast;
+    const { siaga, awas, waspada } = data.thresholds;
+    const severity: InsightSeverity =
+      max6h >= awas ? "danger" : max6h >= siaga ? "warning" : max6h >= waspada ? "info" : "ok";
+    const statusText =
+      max6h >= awas
+        ? `Diprediksi melampaui ambang Awas (${awas.toFixed(2)} m) — waspadai potensi banjir.`
+        : max6h >= siaga
+          ? `Diprediksi mendekati ambang Siaga (${siaga.toFixed(2)} m).`
+          : "Tidak ada potensi melampaui ambang batas.";
+    insights.push({
+      category: "Forecast 6 Jam",
+      text: `Jam berikutnya: ${next.toFixed(3)} m. Rentang 6 jam ke depan: ${min6h.toFixed(3)} – ${max6h.toFixed(3)} m. ${statusText}`,
+      severity,
+    });
+  }
+
+  // 6. Forecast 72 jam
+  if (forecast) {
+    const { max72h, min72h } = forecast;
+    const { siaga, awas, waspada } = data.thresholds;
+    const severity: InsightSeverity =
+      max72h >= awas ? "danger" : max72h >= siaga ? "warning" : max72h >= waspada ? "info" : "ok";
+    const statusText =
+      max72h >= awas
+        ? `Berpotensi melampaui ambang Awas (${awas.toFixed(2)} m) dalam 72 jam ke depan.`
+        : max72h >= siaga
+          ? `Berpotensi mendekati ambang Siaga (${siaga.toFixed(2)} m) dalam 72 jam ke depan.`
+          : "Tidak ada potensi melampaui ambang batas dalam 72 jam ke depan.";
+    insights.push({
+      category: "Forecast 72 Jam",
+      text: `Rentang 3 hari ke depan: ${min72h.toFixed(3)} – ${max72h.toFixed(3)} m. ${statusText}`,
       severity,
     });
   }

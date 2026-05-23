@@ -341,6 +341,8 @@ export type AwlrComparisonPoint = {
   awas: number;
   marginAwas: number;
   lastUpdate: string;
+  latitude: number;
+  longitude: number;
 };
 
 export type AwlrMonitoringData = {

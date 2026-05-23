@@ -1686,6 +1686,8 @@ function toAwlrComparisonPoint(station: RawAwlrMonitoringStation): AwlrCompariso
     awas: thresholds.awas,
     marginAwas: latest?.marginAwas ?? 0,
     lastUpdate: formatClock(station.lastUpdate),
+    latitude:  station.latitude,
+    longitude: station.longitude,
   };
 }
 
