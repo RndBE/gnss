@@ -155,8 +155,8 @@ export default async function DataMasukPage({
                   ) : null}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
+                <div className="w-full overflow-x-auto">
+                  <Table className="min-w-max">
                     <TableHeader>
                       <TableRow className="bg-muted/40 hover:bg-muted/40">
                         <TableHead className="sticky left-0 z-10 bg-muted/40 whitespace-nowrap">
