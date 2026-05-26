@@ -2,8 +2,8 @@
 
 import React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
-import { CalendarRange, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
+import { Combobox } from "@base-ui/react/combobox";
+import { CalendarRange, Check, ChevronsUpDown, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import type {
   AnalysisGranularity,
   AwlrParameter,
@@ -92,18 +93,19 @@ export function DataAnalysisFilterBar({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [stationSearch, setStationSearch] = useState("");
-  const filteredStationOptions = useMemo(() => {
-    const query = stationSearch.trim().toLowerCase();
 
-    if (!query) return stationOptions;
-
-    return stationOptions.filter((station) =>
-      `${station.name} ${station.area} ${station.status}`
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [stationOptions, stationSearch]);
+  const stationItems = React.useMemo(
+    () =>
+      stationOptions.map((station) => ({
+        id: station.id,
+        label: `${station.name} - ${station.area}`,
+        name: station.name,
+        area: station.area,
+      })),
+    [stationOptions],
+  );
+  const selectedStationItem =
+    stationItems.find((item) => item.id === selectedStationId) ?? null;
 
   function updateFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -149,7 +151,7 @@ export function DataAnalysisFilterBar({
   }
 
   return (
-    <div className="interactive-card flex flex-col gap-3 rounded-lg border bg-card p-3 shadow-xs md:flex-row md:items-center md:justify-between">
+    <div className="data-analysis-filter-bar flex flex-col gap-3 rounded-lg border bg-card p-3 shadow-xs md:flex-row md:items-center md:justify-between">
       <div className="flex items-center gap-2 text-sm font-medium">
         <SlidersHorizontal className="interactive-icon size-4 text-muted-foreground" />
         Analisa Data Logger
@@ -180,62 +182,74 @@ export function DataAnalysisFilterBar({
           </SelectContent>
         </Select>
 
-        <Select
-          value={selectedStationId}
-          onValueChange={(value) => {
-            if (value) updateFilter("pos", value);
+        <Combobox.Root
+          items={stationItems}
+          value={selectedStationItem}
+          onValueChange={(item) => {
+            if (item && typeof item === "object" && "id" in item) {
+              updateFilter("pos", item.id);
+            }
           }}
-          items={stationOptions.map((station) => ({
-            label: `${station.name} - ${station.area}`,
-            value: station.id,
-          }))}
+          isItemEqualToValue={(a, b) => a?.id === b?.id}
+          itemToStringLabel={(item) => item?.label ?? ""}
+          itemToStringValue={(item) => item?.id ?? ""}
         >
-          <SelectTrigger
-            size="sm"
-            className="w-full sm:w-[260px] lg:w-[320px] **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
+          <Combobox.Trigger
             aria-label="Pilih pos"
+            className={cn(
+              "flex h-7 w-full items-center justify-between gap-1.5 rounded-[min(var(--radius-md),10px)] border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap outline-none transition-colors select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30 dark:hover:bg-input/50 sm:w-[260px] lg:w-[320px]",
+            )}
           >
-            <SelectValue placeholder="Pilih pos" />
-          </SelectTrigger>
-          <SelectContent
-            align="end"
-            className="min-w-[320px] overflow-hidden"
-          >
-            <div
-              className="sticky top-0 z-10 border-b bg-popover p-2"
-              onKeyDown={(event) => event.stopPropagation()}
-              onPointerDown={(event) => event.stopPropagation()}
-            >
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  aria-label="Cari pos monitoring"
-                  className="h-8 pl-7"
-                  placeholder="Cari nama pos atau area"
-                  value={stationSearch}
-                  onChange={(event) => setStationSearch(event.target.value)}
-                />
-              </div>
-            </div>
-            <SelectGroup>
-              {filteredStationOptions.length > 0 ? (
-                filteredStationOptions.map((station) => (
-                  <SelectItem
-                    className="py-2"
-                    key={station.id}
-                    value={station.id}
-                  >
-                    {station.name} - {station.area}
-                  </SelectItem>
-                ))
-              ) : (
-                <div className="px-2 py-3 text-sm text-muted-foreground">
-                  Pos tidak ditemukan.
-                </div>
+            <Combobox.Value>
+              {(value: { label?: string } | null) => (
+                <span
+                  className={cn(
+                    "line-clamp-1 flex-1 text-left",
+                    !value && "text-muted-foreground",
+                  )}
+                >
+                  {value?.label ?? "Pilih pos"}
+                </span>
               )}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+            </Combobox.Value>
+            <Combobox.Icon className="pointer-events-none flex shrink-0 text-muted-foreground">
+              <ChevronsUpDown className="size-3.5" />
+            </Combobox.Icon>
+          </Combobox.Trigger>
+
+          <Combobox.Portal>
+            <Combobox.Positioner align="end" sideOffset={4} className="isolate z-50">
+              <Combobox.Popup
+                className="max-h-[min(20rem,var(--available-height))] w-[min(var(--anchor-width),var(--available-width))] min-w-[260px] origin-[var(--transform-origin)] overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none transition-[transform,scale,opacity] data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0"
+                aria-label="Pilih pos"
+              >
+                <div className="border-b bg-popover p-2">
+                  <Combobox.Input
+                    placeholder="Cari nama pos atau area"
+                    className="flex h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  />
+                </div>
+                <Combobox.Empty className="px-3 py-4 text-center text-sm text-muted-foreground empty:hidden">
+                  Pos tidak ditemukan.
+                </Combobox.Empty>
+                <Combobox.List className="max-h-64 overflow-y-auto p-1">
+                  {(item: (typeof stationItems)[number]) => (
+                    <Combobox.Item
+                      key={item.id}
+                      value={item}
+                      className="relative flex w-full cursor-default items-center gap-2 rounded-md py-2 pr-8 pl-2 text-sm outline-none select-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                    >
+                      <span className="flex-1 truncate">{item.label}</span>
+                      <Combobox.ItemIndicator className="absolute right-2 flex size-4 items-center justify-center">
+                        <Check className="size-4" />
+                      </Combobox.ItemIndicator>
+                    </Combobox.Item>
+                  )}
+                </Combobox.List>
+              </Combobox.Popup>
+            </Combobox.Positioner>
+          </Combobox.Portal>
+        </Combobox.Root>
 
         <Select
           value={selectedParameter}

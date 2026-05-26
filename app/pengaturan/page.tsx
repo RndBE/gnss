@@ -1,6 +1,7 @@
 import { Database } from "lucide-react";
 
 import { AppShell } from "@/components/dashboard/app-shell";
+import { LoggerParameterSettings } from "@/components/dashboard/logger-parameter-settings";
 import { PasswordSettingsForm } from "@/components/dashboard/password-settings-form";
 import {
   Card,
@@ -20,6 +21,7 @@ import {
 import {
   getDatabaseTableStats,
   getDashboardSummary,
+  getLoggerParametersGrouped,
   getThresholdSettings,
   getUserRoles,
 } from "@/lib/backend/queries";
@@ -27,12 +29,13 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function PengaturanPage() {
-  const [summary, thresholdSettings, userRoles, databaseStats] =
+  const [summary, thresholdSettings, userRoles, databaseStats, gnssLoggers] =
     await Promise.all([
       getDashboardSummary(),
       getThresholdSettings(),
       getUserRoles(),
       getDatabaseTableStats(),
+      getLoggerParametersGrouped("GNSS"),
     ]);
 
   return (
@@ -44,6 +47,8 @@ export default async function PengaturanPage() {
     >
       <div className="grid gap-4">
         <PasswordSettingsForm />
+
+        <LoggerParameterSettings devices={gnssLoggers} />
 
         <Card className="interactive-card">
           <CardHeader>

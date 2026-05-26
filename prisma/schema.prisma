@@ -92,6 +92,8 @@ model MonitoringPoint {
   area               MonitoringArea      @relation(fields: [areaId], references: [id])
   status             RiskStatus          @default(NORMAL)
   latestValue        String?
+  baselineLatitude   Float?
+  baselineLongitude  Float?
   baselineElevationM Float?
   currentElevationM  Float?
   totalSubsidenceCm  Float?
@@ -113,25 +115,54 @@ model MonitoringPoint {
 }
 
 model Device {
-  id               String           @id @default(cuid())
-  code             String           @unique
+  id               String             @id @default(cuid())
+  code             String             @unique
   name             String
   type             DeviceType
-  status           DeviceStatus     @default(ONLINE)
+  status           DeviceStatus       @default(ONLINE)
   battery          Int
   signal           Int
-  solarCharging    Boolean          @default(true)
+  solarCharging    Boolean            @default(true)
   firmwareVersion  String?
   sensorStatus     String?
   lastDataReceived DateTime
   pointId          String?
-  point            MonitoringPoint? @relation(fields: [pointId], references: [id])
+  point            MonitoringPoint?   @relation(fields: [pointId], references: [id])
   maintenanceLogs  MaintenanceLog[]
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  loggerReadings   LoggerReading[]
+  loggerParameters LoggerParameter[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   @@index([status])
   @@index([pointId])
+}
+
+model LoggerReading {
+  id          String   @id @default(cuid())
+  deviceCode  String
+  device      Device   @relation(fields: [deviceCode], references: [code], onDelete: Cascade)
+  recordedAt  DateTime
+  payload     Json
+  createdAt   DateTime @default(now())
+
+  @@index([deviceCode, recordedAt])
+}
+
+model LoggerParameter {
+  id         String   @id @default(cuid())
+  deviceCode String
+  device     Device   @relation(fields: [deviceCode], references: [code], onDelete: Cascade)
+  sensorKey  String
+  label      String
+  unit       String
+  visible    Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([deviceCode, sensorKey])
+  @@index([deviceCode])
 }
 
 model GnssReading {

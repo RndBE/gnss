@@ -311,6 +311,14 @@ async function main() {
       description: "Area muara dan kawasan industri pesisir Kendal.",
     },
   });
+  const yogyakarta = await prisma.monitoringArea.create({
+    data: {
+      name: "Yogyakarta",
+      city: "Kota Yogyakarta",
+      province: "DI Yogyakarta",
+      description: "Area pemantauan GNSS Yogyakarta.",
+    },
+  });
 
   const gnssPkl = await prisma.monitoringPoint.create({
     data: {
@@ -499,6 +507,19 @@ async function main() {
       status: "WASPADA",
       latestValue: "Online",
       lastUpdate: hoursAgo(0.22),
+    },
+  });
+  const gnssYk30073 = await prisma.monitoringPoint.create({
+    data: {
+      code: "gnss-yk-30073",
+      name: "GNSS YK-30073",
+      type: "GNSS",
+      latitude: -7.774325,
+      longitude: 110.449829,
+      areaId: yogyakarta.id,
+      status: "NORMAL",
+      latestValue: "-",
+      lastUpdate: now,
     },
   });
 
@@ -797,6 +818,18 @@ async function main() {
         sensorStatus: "Camera online, panel perlu pengecekan",
         lastDataReceived: hoursAgo(0.22),
         pointId: cctvKdl.id,
+      },
+      {
+        code: "30073",
+        name: "Logger GNSS 30073",
+        type: "LOGGER",
+        status: "ONLINE",
+        battery: 100,
+        signal: 100,
+        firmwareVersion: "1.0.0",
+        sensorStatus: "GNSS aktif",
+        lastDataReceived: now,
+        pointId: gnssYk30073.id,
       },
     ],
   });

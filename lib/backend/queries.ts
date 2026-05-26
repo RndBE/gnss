@@ -883,6 +883,76 @@ async function getRawGnssStationsForMonitoring() {
   });
 }
 
+function extractSensorNumeric(
+  payload: unknown,
+  label: string,
+): number | null {
+  if (!payload || typeof payload !== "object") return null;
+  for (const value of Object.values(payload as Record<string, unknown>)) {
+    if (!value || typeof value !== "object") continue;
+    const entry = value as { nama?: unknown; nilai?: unknown };
+    if (entry.nama !== label) continue;
+    const n =
+      typeof entry.nilai === "number"
+        ? entry.nilai
+        : typeof entry.nilai === "string"
+          ? Number(entry.nilai)
+          : NaN;
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+async function buildLoggerGnssTrend(
+  deviceCode: string,
+  baselineLat: number | null,
+  baselineLon: number | null,
+  baselineAlt: number | null,
+): Promise<GnssTrendPoint[]> {
+  const readings = await prisma.loggerReading.findMany({
+    where: { deviceCode },
+    orderBy: { recordedAt: "asc" },
+  });
+  if (readings.length === 0) return [];
+
+  return readings.map((reading) => {
+    const lat = extractSensorNumeric(reading.payload, "Latitude");
+    const lon = extractSensorNumeric(reading.payload, "Longitude");
+    const alt = extractSensorNumeric(reading.payload, "Altitude");
+    const satellites = extractSensorNumeric(reading.payload, "Satellites") ?? 0;
+    const hdop = extractSensorNumeric(reading.payload, "HDOP") ?? 0;
+
+    const dY =
+      baselineLat != null && lat != null
+        ? (lat - baselineLat) * METERS_PER_DEG_LAT * 1000
+        : 0;
+    const dX =
+      baselineLon != null && lon != null
+        ? (lon - baselineLon) *
+          METERS_PER_DEG_LAT *
+          Math.cos(((baselineLat ?? lat ?? 0) * Math.PI) / 180) *
+          1000
+        : 0;
+    const dZmm =
+      baselineAlt != null && alt != null ? (alt - baselineAlt) * 1000 : 0;
+    const dZcm = dZmm / 10;
+
+    return {
+      period: formatGnssPeriod(reading.recordedAt),
+      recordedAt: reading.recordedAt.toISOString(),
+      x: round(dX),
+      y: round(dY),
+      z: round(dZmm),
+      velocity: 0,
+      elevation: alt != null ? round(alt, 2) : 0,
+      subsidence: round(dZcm, 2),
+      satellites: Math.round(satellites),
+      pdop: round(hdop, 2),
+      fixRatio: 100,
+    };
+  });
+}
+
 type RawGnssMonitoringStation = Awaited<
   ReturnType<typeof getRawGnssStationsForMonitoring>
 >[number];
@@ -1384,9 +1454,21 @@ export async function getGnssMonitoringData(filters: {
     throw new Error("Belum ada titik GNSS di database.");
   }
 
-  const allTrend = selected.gnssReadings.map((reading, index) =>
-    toGnssTrendPoint(reading, selected.code, index),
-  );
+  const linkedDevice = selected.devices[0] ?? null;
+  const loggerTrend = linkedDevice
+    ? await buildLoggerGnssTrend(
+        linkedDevice.code,
+        selected.baselineLatitude,
+        selected.baselineLongitude,
+        selected.baselineElevationM,
+      )
+    : [];
+  const allTrend =
+    loggerTrend.length > 0
+      ? loggerTrend
+      : selected.gnssReadings.map((reading, index) =>
+          toGnssTrendPoint(reading, selected.code, index),
+        );
   const lastTrend = allTrend[allTrend.length - 1] ?? null;
   const trend = filterTrendByRange(
     allTrend,
@@ -1992,5 +2074,242 @@ export async function getMaintenanceLogs(): Promise<MaintenanceLog[]> {
 export async function getRiskWeights(): Promise<RiskWeightSetting[]> {
   return prisma.riskWeight.findMany({
     orderBy: { weight: "desc" },
+  });
+}
+
+function extractLatestSensorValue(
+  payload: unknown,
+  sensorKey: string,
+): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const entry = (payload as Record<string, unknown>)[sensorKey];
+  if (!entry || typeof entry !== "object") return null;
+  const value = (entry as Record<string, unknown>).nilai;
+  if (value == null) return null;
+  return typeof value === "number" ? value.toString() : String(value);
+}
+
+const METERS_PER_DEG_LAT = 111320;
+
+function computeGnssBaseline(point: {
+  baselineLatitude: number | null;
+  baselineLongitude: number | null;
+  baselineElevationM: number | null;
+  latitude: number;
+  longitude: number;
+  currentElevationM: number | null;
+}): import("@/lib/types").LoggerGnssBaseline {
+  const baselineLat = point.baselineLatitude;
+  const baselineLon = point.baselineLongitude;
+  const baselineAlt = point.baselineElevationM;
+  const currentLat = point.latitude;
+  const currentLon = point.longitude;
+  const currentAlt = point.currentElevationM;
+
+  let displacementYmm: number | null = null;
+  let displacementXmm: number | null = null;
+  let displacementZcm: number | null = null;
+
+  if (baselineLat != null) {
+    displacementYmm = (currentLat - baselineLat) * METERS_PER_DEG_LAT * 1000;
+  }
+  if (baselineLon != null) {
+    const cosLat = Math.cos(((baselineLat ?? currentLat) * Math.PI) / 180);
+    displacementXmm =
+      (currentLon - baselineLon) * METERS_PER_DEG_LAT * cosLat * 1000;
+  }
+  if (baselineAlt != null && currentAlt != null) {
+    displacementZcm = (currentAlt - baselineAlt) * 100;
+  }
+
+  return {
+    baselineLatitude: baselineLat,
+    baselineLongitude: baselineLon,
+    baselineElevationM: baselineAlt,
+    currentLatitude: currentLat,
+    currentLongitude: currentLon,
+    currentElevationM: currentAlt,
+    displacementXmm:
+      displacementXmm != null ? Number(displacementXmm.toFixed(2)) : null,
+    displacementYmm:
+      displacementYmm != null ? Number(displacementYmm.toFixed(2)) : null,
+    displacementZcm:
+      displacementZcm != null ? Number(displacementZcm.toFixed(2)) : null,
+  };
+}
+
+export async function getLoggerDevicePickerOptions(): Promise<
+  import("@/lib/types").LoggerDevicePickerOption[]
+> {
+  const devices = await prisma.device.findMany({
+    where: {
+      OR: [
+        { loggerReadings: { some: {} } },
+        { loggerParameters: { some: {} } },
+      ],
+    },
+    include: {
+      point: { include: { area: true } },
+      _count: { select: { loggerReadings: true } },
+    },
+    orderBy: [{ type: "asc" }, { code: "asc" }],
+  });
+
+  return devices.map((device) => ({
+    deviceCode: device.code,
+    deviceName: device.name,
+    pointName: device.point?.name ?? null,
+    area: device.point?.area.name ?? null,
+    readingCount: device._count.loggerReadings,
+  }));
+}
+
+function getJakartaDateKey(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function getJakartaTimeLabel(date: Date): string {
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+export async function getLoggerReadingsForDay(
+  deviceCode: string | null | undefined,
+  date: string | null | undefined,
+): Promise<import("@/lib/types").LoggerReadingDay | null> {
+  if (!deviceCode) return null;
+
+  const device = await prisma.device.findUnique({
+    where: { code: deviceCode },
+    include: {
+      point: { include: { area: true } },
+      loggerParameters: { orderBy: { sortOrder: "asc" } },
+    },
+  });
+  if (!device) return null;
+
+  const allReadings = await prisma.loggerReading.findMany({
+    where: { deviceCode },
+    select: { recordedAt: true },
+  });
+  const availableDates = Array.from(
+    new Set(allReadings.map((r) => getJakartaDateKey(r.recordedAt))),
+  ).sort((a, b) => b.localeCompare(a));
+
+  const targetDate =
+    date && availableDates.includes(date)
+      ? date
+      : (availableDates[0] ?? date ?? getJakartaDateKey(new Date()));
+
+  const dayReadings = await prisma.loggerReading.findMany({
+    where: { deviceCode },
+    orderBy: { recordedAt: "desc" },
+  });
+  const filtered = dayReadings.filter(
+    (r) => getJakartaDateKey(r.recordedAt) === targetDate,
+  );
+
+  const rows: import("@/lib/types").LoggerReadingRow[] = filtered.map(
+    (reading) => {
+      const values: Record<string, string | null> = {};
+      for (const parameter of device.loggerParameters) {
+        values[parameter.sensorKey] = extractLatestSensorValue(
+          reading.payload,
+          parameter.sensorKey,
+        );
+      }
+      return {
+        id: reading.id,
+        recordedAt: reading.recordedAt.toISOString(),
+        recordedAtLabel: getJakartaTimeLabel(reading.recordedAt),
+        values,
+      };
+    },
+  );
+
+  return {
+    deviceCode: device.code,
+    deviceName: device.name,
+    pointName: device.point?.name ?? null,
+    area: device.point?.area.name ?? null,
+    date: targetDate,
+    parameters: device.loggerParameters.map((p) => ({
+      sensorKey: p.sensorKey,
+      label: p.label,
+      unit: p.unit,
+    })),
+    rows,
+    totalForDay: rows.length,
+    totalAll: allReadings.length,
+    availableDates,
+  };
+}
+
+export async function getLoggerParametersGrouped(
+  pointType?: "GNSS" | "AWLR" | "CCTV" | "WEATHER",
+): Promise<import("@/lib/types").LoggerDeviceParameters[]> {
+  const devices = await prisma.device.findMany({
+    where: pointType
+      ? {
+          OR: [
+            { type: pointType as "GNSS" | "AWLR" | "CCTV" | "WEATHER" },
+            { point: { type: pointType } },
+          ],
+        }
+      : undefined,
+    include: {
+      point: {
+        include: { area: true },
+      },
+      loggerParameters: {
+        orderBy: { sortOrder: "asc" },
+      },
+      loggerReadings: {
+        orderBy: { recordedAt: "desc" },
+        take: 1,
+      },
+    },
+    orderBy: [{ type: "asc" }, { code: "asc" }],
+  });
+
+  return devices.map((device) => {
+    const latest = device.loggerReadings[0] ?? null;
+    const point = device.point;
+    return {
+      deviceCode: device.code,
+      deviceName: device.name,
+      deviceType: device.type,
+      pointCode: point?.code ?? null,
+      pointName: point?.name ?? null,
+      pointType: point?.type ?? null,
+      area: point?.area.name ?? null,
+      lastDataAt: latest ? formatDayDateTime(latest.recordedAt) : null,
+      parameters: device.loggerParameters.map((parameter) => ({
+        deviceCode: device.code,
+        deviceName: device.name,
+        deviceType: device.type,
+        sensorKey: parameter.sensorKey,
+        label: parameter.label,
+        unit: parameter.unit,
+        visible: parameter.visible,
+        sortOrder: parameter.sortOrder,
+        latestValue: latest
+          ? extractLatestSensorValue(latest.payload, parameter.sensorKey)
+          : null,
+        recordedAt: latest ? formatDayDateTime(latest.recordedAt) : null,
+      })),
+      baseline:
+        point && point.type === "GNSS" ? computeGnssBaseline(point) : null,
+    };
   });
 }

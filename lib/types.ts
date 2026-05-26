@@ -370,6 +370,76 @@ export type DataLoggerParameter = {
   value: string;
 };
 
+export type LoggerParameterConfig = {
+  deviceCode: string;
+  deviceName: string;
+  deviceType: "GNSS" | "AWLR" | "CCTV" | "LOGGER" | "WEATHER";
+  sensorKey: string;
+  label: string;
+  unit: string;
+  visible: boolean;
+  sortOrder: number;
+  latestValue: string | null;
+  recordedAt: string | null;
+};
+
+export type LoggerGnssBaseline = {
+  baselineLatitude: number | null;
+  baselineLongitude: number | null;
+  baselineElevationM: number | null;
+  currentLatitude: number | null;
+  currentLongitude: number | null;
+  currentElevationM: number | null;
+  displacementXmm: number | null;
+  displacementYmm: number | null;
+  displacementZcm: number | null;
+};
+
+export type LoggerDevicePickerOption = {
+  deviceCode: string;
+  deviceName: string;
+  pointName: string | null;
+  area: string | null;
+  readingCount: number;
+};
+
+export type LoggerReadingRow = {
+  id: string;
+  recordedAt: string;
+  recordedAtLabel: string;
+  values: Record<string, string | null>;
+};
+
+export type LoggerReadingDay = {
+  deviceCode: string;
+  deviceName: string;
+  pointName: string | null;
+  area: string | null;
+  date: string;
+  parameters: Array<{
+    sensorKey: string;
+    label: string;
+    unit: string;
+  }>;
+  rows: LoggerReadingRow[];
+  totalForDay: number;
+  totalAll: number;
+  availableDates: string[];
+};
+
+export type LoggerDeviceParameters = {
+  deviceCode: string;
+  deviceName: string;
+  deviceType: "GNSS" | "AWLR" | "CCTV" | "LOGGER" | "WEATHER";
+  pointCode: string | null;
+  pointName: string | null;
+  pointType: "GNSS" | "AWLR" | "CCTV" | "WEATHER" | null;
+  area: string | null;
+  lastDataAt: string | null;
+  parameters: LoggerParameterConfig[];
+  baseline: LoggerGnssBaseline | null;
+};
+
 export type DataLoggerFeed = {
   id: string;
   name: string;

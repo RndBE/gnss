@@ -87,12 +87,22 @@ function getData(activePath = "/") {
         title: "Sensor",
         url: "/perangkat",
         icon: <RadioTowerIcon />,
-        isActive: isActive(activePath, ["/perangkat", "/gnss", "/awlr"]),
+        isActive: isActive(activePath, [
+          "/perangkat",
+          "/data-masuk",
+          "/gnss",
+          "/awlr",
+        ]),
         items: [
           {
             title: "Perangkat Logger",
             url: "/perangkat",
             isActive: activePath === "/perangkat",
+          },
+          {
+            title: "Data Masuk",
+            url: "/data-masuk",
+            isActive: activePath === "/data-masuk",
           },
         ],
       },

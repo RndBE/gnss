@@ -1,15 +1,16 @@
 import {
   Activity,
   AlertTriangle,
-  BatteryCharging,
   Clock3,
+  Droplets,
   Gauge,
   MapPin,
   RadioTower,
   Satellite,
-  Signal,
+  Thermometer,
   TrendingDown,
   Waves,
+  Zap,
 } from "lucide-react";
 
 import { DataAnalysisChart } from "@/components/dashboard/data-analysis-chart";
@@ -37,8 +38,9 @@ import {
   getAwlrMonitoringData,
   getDashboardSummary,
   getGnssMonitoringData,
+  getLoggerParametersGrouped,
 } from "@/lib/backend/queries";
-import { getTidalForecast, getTidalForecastPerStation, type TidalForecast } from "@/lib/backend/forecast";
+import { getTidalForecastPerStation, type TidalForecast } from "@/lib/backend/forecast";
 import { generateAwlrInsights, generateGnssInsights } from "@/lib/insights";
 import { InsightPanel } from "@/components/dashboard/insight-panel";
 import type {
@@ -53,6 +55,7 @@ import type {
   GnssMonitoringData,
   GnssQualityStatus,
   GnssTrendStatus,
+  LoggerDeviceParameters,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -99,6 +102,13 @@ function normalizeMode(value: string | string[] | undefined): DataAnalysisMode {
   return firstParam(value) === "awlr" ? "awlr" : "gnss";
 }
 
+function findLoggerParameter(
+  loggerDevice: LoggerDeviceParameters | null,
+  label: string,
+) {
+  return loggerDevice?.parameters.find((p) => p.label === label) ?? null;
+}
+
 function formatAxis(value: number, unit = "mm") {
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)} ${unit}`;
@@ -126,25 +136,68 @@ function MetricCard({ metric }: { metric: GnssMetric | AwlrMetric }) {
   );
 }
 
-function TelemetryValue({
+function BaselineDisplacementRow({
+  label,
+  baseline,
+  displacement,
+  unit,
+  baselineDigits,
+}: {
+  label: string;
+  baseline: number | null;
+  displacement: number | null;
+  unit: string;
+  baselineDigits: number;
+}) {
+  const sign = displacement != null && displacement > 0 ? "+" : "";
+  const tone =
+    displacement == null
+      ? "text-muted-foreground"
+      : displacement > 0
+        ? "text-emerald-600"
+        : displacement < 0
+          ? "text-red-600"
+          : "";
+  return (
+    <div className="grid grid-cols-[40px_1fr_1fr] items-center gap-2 text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono tabular-nums">
+        {baseline == null ? "-" : baseline.toFixed(baselineDigits)}
+      </span>
+      <span className={cn("font-mono font-medium tabular-nums", tone)}>
+        {displacement == null
+          ? "-"
+          : `${sign}${displacement.toFixed(2)} ${unit}`}
+      </span>
+    </div>
+  );
+}
+
+function LoggerTelemetryRow({
   icon: Icon,
   label,
   value,
+  unit,
 }: {
-  icon: typeof BatteryCharging;
+  icon: typeof Droplets;
   label: string;
-  value: number;
+  value: string | null;
+  unit: string;
 }) {
   return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="flex items-center gap-1 text-muted-foreground">
-          <Icon className="size-3" />
-          {label}
-        </span>
-        <span className="font-medium tabular-nums">{value}%</span>
-      </div>
-      <Progress value={value} />
+    <div className="flex items-center justify-between gap-3 text-xs">
+      <span className="flex items-center gap-1.5 text-muted-foreground">
+        <Icon className="size-3.5" />
+        {label}
+      </span>
+      <span className="font-medium tabular-nums">
+        {value ?? "-"}
+        {value && unit && unit !== "-" ? (
+          <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+            {unit}
+          </span>
+        ) : null}
+      </span>
     </div>
   );
 }
@@ -152,13 +205,19 @@ function TelemetryValue({
 function DeviceCard({
   data,
   mode,
+  loggerDevice,
 }: {
   data: GnssMonitoringData | AwlrMonitoringData;
   mode: DataAnalysisMode;
+  loggerDevice?: LoggerDeviceParameters | null;
 }) {
   const station = data.selectedStation;
   const device = station.device;
   const TypeIcon = mode === "gnss" ? RadioTower : Waves;
+  const humi = findLoggerParameter(loggerDevice ?? null, "Humi_Logger");
+  const battV = findLoggerParameter(loggerDevice ?? null, "Batt_Logger");
+  const temp = findLoggerParameter(loggerDevice ?? null, "Temp_Logger");
+  const hasLoggerTelemetry = Boolean(humi || battV || temp);
 
   return (
     <Card className="interactive-card">
@@ -187,24 +246,58 @@ function DeviceCard({
           </div>
 
           {"baselineElevation" in station ? (
-            <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
-              <div>
-                <p className="text-muted-foreground">Baseline</p>
-                <p className="mt-0.5 font-medium">{station.baselineElevation}</p>
+            loggerDevice?.baseline ? (
+              <div className="mt-2 space-y-1">
+                <div className="grid grid-cols-[40px_1fr_1fr] gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <span></span>
+                  <span>Baseline</span>
+                  <span>Pergeseran</span>
+                </div>
+                <BaselineDisplacementRow
+                  label="X"
+                  baseline={loggerDevice.baseline.baselineLongitude}
+                  displacement={loggerDevice.baseline.displacementXmm}
+                  unit="mm"
+                  baselineDigits={6}
+                />
+                <BaselineDisplacementRow
+                  label="Y"
+                  baseline={loggerDevice.baseline.baselineLatitude}
+                  displacement={loggerDevice.baseline.displacementYmm}
+                  unit="mm"
+                  baselineDigits={6}
+                />
+                <BaselineDisplacementRow
+                  label="Z"
+                  baseline={loggerDevice.baseline.baselineElevationM}
+                  displacement={loggerDevice.baseline.displacementZcm}
+                  unit="cm"
+                  baselineDigits={2}
+                />
+                <p className="pt-1 text-[10px] text-muted-foreground">
+                  Update {station.lastUpdate}
+                </p>
               </div>
-              <div>
-                <p className="text-muted-foreground">Elevasi kini</p>
-                <p className="mt-0.5 font-medium">{station.currentElevation}</p>
+            ) : (
+              <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
+                <div>
+                  <p className="text-muted-foreground">Baseline</p>
+                  <p className="mt-0.5 font-medium">{station.baselineElevation}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Elevasi kini</p>
+                  <p className="mt-0.5 font-medium">{station.currentElevation}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Total turun</p>
+                  <p className="mt-0.5 font-medium">{station.totalSubsidence}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Update</p>
+                  <p className="mt-0.5 font-medium">{station.lastUpdate}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-muted-foreground">Total turun</p>
-                <p className="mt-0.5 font-medium">{station.totalSubsidence}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Update</p>
-                <p className="mt-0.5 font-medium">{station.lastUpdate}</p>
-              </div>
-            </div>
+            )
           ) : (
             <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
               <div>
@@ -243,14 +336,34 @@ function DeviceCard({
                 {device.status}
               </Badge>
             </div>
-            <div className="space-y-2">
-              <TelemetryValue
-                icon={BatteryCharging}
-                label="Baterai"
-                value={device.battery}
-              />
-              <TelemetryValue icon={Signal} label="Sinyal" value={device.signal} />
-            </div>
+            {hasLoggerTelemetry ? (
+              <div className="space-y-1.5 rounded-md border bg-muted/30 px-2.5 py-2">
+                {battV ? (
+                  <LoggerTelemetryRow
+                    icon={Zap}
+                    label="Tegangan logger"
+                    value={battV.latestValue}
+                    unit={battV.unit}
+                  />
+                ) : null}
+                {temp ? (
+                  <LoggerTelemetryRow
+                    icon={Thermometer}
+                    label="Suhu logger"
+                    value={temp.latestValue}
+                    unit={temp.unit}
+                  />
+                ) : null}
+                {humi ? (
+                  <LoggerTelemetryRow
+                    icon={Droplets}
+                    label="Kelembapan logger"
+                    value={humi.latestValue}
+                    unit={humi.unit}
+                  />
+                ) : null}
+              </div>
+            ) : null}
             <div className="grid gap-1 text-xs text-muted-foreground">
               <p className="flex items-center gap-2">
                 <Clock3 className="size-3.5" />
@@ -807,7 +920,7 @@ export default async function AnalisaDataPage({ searchParams }: AnalisaDataPageP
     );
   }
 
-  const [summary, data] = await Promise.all([
+  const [summary, data, gnssLoggers] = await Promise.all([
     getDashboardSummary(),
     getGnssMonitoringData({
       stationId: firstParam(params.pos),
@@ -817,9 +930,14 @@ export default async function AnalisaDataPage({ searchParams }: AnalisaDataPageP
       dateTo: firstParam(params.to),
       granularity: firstParam(params.granularity),
     }),
+    getLoggerParametersGrouped("GNSS"),
   ]);
 
   const gnssInsights = generateGnssInsights(data);
+  const selectedDeviceCode = data.selectedStation.device?.id ?? null;
+  const selectedLoggerDevice = selectedDeviceCode
+    ? gnssLoggers.find((d) => d.deviceCode === selectedDeviceCode) ?? null
+    : null;
 
   return (
     <AppShell
@@ -847,7 +965,11 @@ export default async function AnalisaDataPage({ searchParams }: AnalisaDataPageP
           }
         />
         <div className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <DeviceCard data={data} mode="gnss" />
+          <DeviceCard
+            data={data}
+            mode="gnss"
+            loggerDevice={selectedLoggerDevice}
+          />
           <div className="grid gap-3">
             <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 xl:grid-cols-4">
               {data.metrics.map((metric) => (

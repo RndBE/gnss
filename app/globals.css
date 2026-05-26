@@ -293,7 +293,6 @@ a {
   .interactive-card {
     transform: translateZ(0);
     transition:
-      transform 180ms ease,
       box-shadow 180ms ease,
       border-color 180ms ease,
       background-color 180ms ease;
@@ -301,12 +300,7 @@ a {
 
   .interactive-card:hover,
   .interactive-card:focus-within {
-    transform: translateY(-2px);
     box-shadow: 0 14px 32px rgb(15 23 42 / 0.08);
-  }
-
-  .interactive-card:active {
-    transform: translateY(0);
   }
 
   .interactive-tile {
@@ -344,6 +338,12 @@ a {
   [data-slot="button"]:hover > svg,
   [data-slot="sidebar-menu-button"]:hover > svg {
     transform: translateY(-1px);
+  }
+
+  .data-analysis-filter-bar [data-slot="button"],
+  .data-analysis-filter-bar [data-slot="button"]:active,
+  .data-analysis-filter-bar [data-slot="button"]:hover > svg {
+    transform: none !important;
   }
 
   [data-slot="table-body"] [data-slot="table-row"] {
