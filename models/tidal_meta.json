@@ -1,0 +1,133 @@
+{
+  "t0": "2024-01-01 00:00:00",
+  "rmse": 0.08488785860662669,
+  "base_lat": -7.8,
+  "base_lon": 110.0,
+  "wave_speed_deg_per_hour": 2.5,
+  "constituents": [
+    {
+      "name": "M2",
+      "period_hours": 12.4206
+    },
+    {
+      "name": "S2",
+      "period_hours": 12.0
+    },
+    {
+      "name": "N2",
+      "period_hours": 12.6584
+    },
+    {
+      "name": "K2",
+      "period_hours": 11.9673
+    },
+    {
+      "name": "L2",
+      "period_hours": 12.1916
+    },
+    {
+      "name": "2N2",
+      "period_hours": 12.905
+    },
+    {
+      "name": "mu2",
+      "period_hours": 12.8718
+    },
+    {
+      "name": "nu2",
+      "period_hours": 12.626
+    },
+    {
+      "name": "K1",
+      "period_hours": 23.9345
+    },
+    {
+      "name": "O1",
+      "period_hours": 25.8194
+    },
+    {
+      "name": "P1",
+      "period_hours": 24.0659
+    },
+    {
+      "name": "Q1",
+      "period_hours": 26.8684
+    },
+    {
+      "name": "J1",
+      "period_hours": 23.0985
+    },
+    {
+      "name": "OO1",
+      "period_hours": 22.3061
+    },
+    {
+      "name": "M1",
+      "period_hours": 24.8412
+    },
+    {
+      "name": "S1",
+      "period_hours": 24.0
+    },
+    {
+      "name": "Mf",
+      "period_hours": 327.859
+    },
+    {
+      "name": "Mm",
+      "period_hours": 661.311
+    },
+    {
+      "name": "Ssa",
+      "period_hours": 4382.91
+    },
+    {
+      "name": "Sa",
+      "period_hours": 8765.82
+    },
+    {
+      "name": "M4",
+      "period_hours": 6.2103
+    },
+    {
+      "name": "MS4",
+      "period_hours": 6.1033
+    },
+    {
+      "name": "MN4",
+      "period_hours": 6.2695
+    },
+    {
+      "name": "M6",
+      "period_hours": 4.1402
+    },
+    {
+      "name": "S4",
+      "period_hours": 6.0
+    },
+    {
+      "name": "MK3",
+      "period_hours": 8.1771
+    },
+    {
+      "name": "SK3",
+      "period_hours": 8.0
+    },
+    {
+      "name": "MO3",
+      "period_hours": 8.3863
+    },
+    {
+      "name": "M3",
+      "period_hours": 8.2804
+    },
+    {
+      "name": "S3",
+      "period_hours": 8.0
+    },
+    {
+      "name": "N3",
+      "period_hours": 8.4389
+    }
+  ]
+}
